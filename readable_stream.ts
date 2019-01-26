@@ -7,7 +7,7 @@ import {
   SetUpReadableByteStreamController,
   SetUpReadableByteStreamControllerFromUnderlyingSource
 } from "./readable_stream_reader";
-import { Assert } from "./util";
+import {Assert} from "./util";
 import {
   ReadableByteStreamController,
   ReadableStreamDefaultController,
@@ -22,7 +22,7 @@ import {
   MakeSizeAlgorithmFromSizeFunction,
   ValidateAndNormalizeHighWaterMark
 } from "./misc.ts";
-import { defer } from "./defer";
+import {defer} from "./defer";
 
 export type UnderlyingSource = {
   type?: string;
@@ -33,14 +33,14 @@ export type UnderlyingSource = {
 };
 
 export type Strategy = {
-  size?: (chunk) => number;
+  size?: SizeAlgorithm
   highWaterMark?: number;
 };
 
-export type StartAlgorithm = () => Promise<any>;
-export type PullAlgorithm = () => Promise<any>;
+export type StartAlgorithm = (controller: ReadableStreamDefaultController | ReadableByteStreamController) => Promise<any>;
+export type PullAlgorithm = (controller: ReadableByteStreamController | ReadableStreamDefaultController) => Promise<any>;
 export type CancelAlgorithm = (reason) => Promise<any>;
-export type SizeAlgorithm<T = any> = (chunk: T) => number;
+export type SizeAlgorithm = (chunk: ReadableStreamReadResult) => number;
 
 export type ReadableStreamReadResult = { value; done: boolean };
 
@@ -50,8 +50,8 @@ export class ReadableStream {
     strategy: Strategy
   ) {
     InitializeReadableStream(this);
-    let { highWaterMark, size } = strategy;
-    const { type } = underlyingSource;
+    let {highWaterMark, size} = strategy;
+    const {type} = underlyingSource;
     if (type === "bytes") {
       if (size !== void 0) {
         throw new RangeError();
@@ -114,13 +114,14 @@ export class ReadableStream {
     throw new RangeError();
   }
 
-  pipeThrough({ writable, readable }, options) {
+  pipeThrough({writable, readable}, options) {
     if (!IsReadableStream(this)) {
       throw new TypeError();
     }
   }
 
-  pipeTo(dest, p: { preventClose; preventAbort; preventCancel; signal }) {}
+  pipeTo(dest, p: { preventClose; preventAbort; preventCancel; signal }) {
+  }
 
   tee() {
     if (!IsReadableStream(this)) {
@@ -168,7 +169,7 @@ function CreateReadableStreamInternal(
     cancelAlgorithm,
     autoAllocateChunkSize
   } = params;
-  let { highWaterMark, sizeAlgorithm } = params;
+  let {highWaterMark, sizeAlgorithm} = params;
   if (highWaterMark === void 0) {
     highWaterMark = 1;
   }
@@ -275,7 +276,7 @@ export function ReadableStreamTee(
     return ReadableStreamDefaultReaderRead(reader).then(
       (result: { value; done: boolean }) => {
         Assert(typeof result === "object");
-        const { value, done } = result;
+        const {value, done} = result;
         Assert(typeof done === "boolean");
         if (done && !closedOrErrored) {
           if (!canceled1) {
@@ -365,7 +366,8 @@ export function ReadableStreamPipeTo(params: {
   preventAbort;
   preventCancel;
   signal;
-}) {}
+}) {
+}
 
 export function ReadableStreamAddReadIntoRequest(
   stream: ReadableStream,
@@ -375,7 +377,7 @@ export function ReadableStreamAddReadIntoRequest(
   const reader = stream.reader as ReadableStreamBYOBReader;
   Assert(stream.state === "readable" || stream.state === "closed");
   const promise = defer();
-  const readIntoRequest = { promise, forAuthorCode };
+  const readIntoRequest = {promise, forAuthorCode};
   reader.readIntoRequests.push(readIntoRequest);
   return promise;
 }
@@ -388,7 +390,7 @@ export function ReadableStreamAddReadRequest(
   const reader = stream.reader as ReadableStreamDefaultReader;
   Assert(stream.state === "readable" || stream.state === "closed");
   const promise = defer<{ value; done: boolean }>();
-  const readIntoRequest = { promise, forAuthorCode };
+  const readIntoRequest = {promise, forAuthorCode};
   reader.readRequests.push(readIntoRequest);
   return promise;
 }
@@ -440,7 +442,7 @@ export function ReadableStreamCreateReadResult(
   const ret = forAuthorCode ? Object.create({}) : Object.create(null);
   ret["value"] = value;
   ret["done"] = done;
-  return { value, done };
+  return {value, done};
 }
 
 export function ReadableStreamError(stream: ReadableStream, e) {

@@ -1,4 +1,4 @@
-import { Assert } from "./util.ts";
+import {Assert} from "./util.ts";
 import {
   IsReadableByteStreamController,
   IsReadableStreamDefaultController,
@@ -12,7 +12,7 @@ import {
   SetUpReadableByteStreamController,
   SetUpReadableStreamBYOBRequest
 } from "./readable_stream_reader.ts";
-import { ReadableStreamBYOBRequest } from "./readable_stream_request.ts";
+import {ReadableStreamBYOBRequest} from "./readable_stream_request.ts";
 import {
   CancelAlgorithm,
   IsReadableStreamLocked,
@@ -35,7 +35,7 @@ import {
   InvokeOrNoop,
   ResetQueue
 } from "./queue.ts";
-import { DequeueValue, EnqueueValueWithSize } from "./misc";
+import {DequeueValue, EnqueueValueWithSize} from "./misc";
 
 export type PullIntoDescriptor = {
   buffer: { ArrayBufferData; ViewedArrayBuffer: ArrayBuffer };
@@ -86,7 +86,7 @@ export class ReadableByteStreamController extends ReadableStreamControllerBase {
     }
     if (this._byobRequest === void 0 && this.pendingPullIntos.length > 0) {
       const firstDescriptor = this.pendingPullIntos[0];
-      const { buffer, byteOffset, bytesFilled, byteLength } = firstDescriptor;
+      const {buffer, byteOffset, bytesFilled, byteLength} = firstDescriptor;
       const view = new Uint8Array(
         buffer,
         byteOffset + bytesFilled,
@@ -173,7 +173,7 @@ export class ReadableByteStreamController extends ReadableStreamControllerBase {
       );
       return ReadableStreamCreateReadResult(view, false, forAuthorCode);
     }
-    const { autoAllocateChunkSize } = this;
+    const {autoAllocateChunkSize} = this;
     if (autoAllocateChunkSize !== void 0) {
       let buffer: ArrayBuffer;
       try {
@@ -422,7 +422,7 @@ export function SetUpReadableStreamDefaultController(params: {
     pullAlgorithm,
     cancelAlgorithm
   } = params;
-  let { highWaterMark, sizeAlgorithm } = params;
+  let {highWaterMark, sizeAlgorithm} = params;
   Assert(stream.readableStreamController === void 0);
   controller.controlledReadableStream = stream;
   controller.queue = void 0;
@@ -455,7 +455,7 @@ export function SetUpReadableStreamDefaultControllerFromUnderlyingSource(params:
   highWaterMark: number;
   sizeAlgorithm: SizeAlgorithm;
 }) {
-  const { stream, underlyingSource, highWaterMark, sizeAlgorithm } = params;
+  const {stream, underlyingSource, highWaterMark, sizeAlgorithm} = params;
   Assert(underlyingSource !== void 0);
   const controller = new ReadableStreamDefaultController();
   const startAlgorithm = () =>
@@ -471,19 +471,13 @@ export function SetUpReadableStreamDefaultControllerFromUnderlyingSource(params:
     "cancel",
     1
   );
-  const autoAllocateChunkSize = underlyingSource["autoAllocateChunkSize"];
-  if (autoAllocateChunkSize !== void 0) {
-    if (!Number.isInteger(autoAllocateChunkSize) || autoAllocateChunkSize < 0) {
-      throw new RangeError();
-    }
-  }
-  SetUpReadableByteStreamController({
+  SetUpReadableStreamDefaultController({
     stream,
     controller,
     startAlgorithm,
     pullAlgorithm,
     cancelAlgorithm,
     highWaterMark,
-    autoAllocateChunkSize
+    sizeAlgorithm,
   });
 }

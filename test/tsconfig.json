@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "ES7",
+    "jsx": "react",
+    "lib": [
+      "es2018",
+      "esnext",
+      "dom"
+    ],
+    "importHelpers": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true
+  }
+}

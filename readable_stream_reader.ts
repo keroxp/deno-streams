@@ -67,7 +67,7 @@ export class ReadableStreamDefaultReader {
     return ReadableStreamReaderGenericCancel(this, reason);
   }
 
-  read(view): Promise<ReadableStreamReadResult> {
+  read(): Promise<ReadableStreamReadResult> {
     if (!IsReadableStreamDefaultReader(this)) {
       return Promise.reject(new TypeError());
     }
@@ -84,7 +84,7 @@ export class ReadableStreamDefaultReader {
     if (this.ownerReadableStream === void 0) {
       return Promise.reject(new TypeError());
     }
-    if (this.readIntoRequests.length > 0) {
+    if (this.readRequests.length > 0) {
       throw new TypeError();
     }
     ReadableStreamReaderGenericRelease(this);

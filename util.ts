@@ -1,4 +1,3 @@
-
 export function Assert(cond: boolean) {
-    if (cond === false) throw new Error()
+  if (cond === false) throw new Error();
 }

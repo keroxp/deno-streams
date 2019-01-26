@@ -1,5 +1,5 @@
-import {Assert} from "./util";
-import {UnderlyingSource} from "./readable_stream";
+import {Assert} from "./util.ts";
+import {UnderlyingSource} from "./readable_stream.ts";
 
 export interface Queueable {
     queue: { value: any, size: number }[],

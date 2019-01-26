@@ -13,7 +13,7 @@ import {
     SetUpReadableStreamDefaultController,
     SetUpReadableStreamDefaultControllerFromUnderlyingSource,
 } from "./readable_stream_controller";
-import {IsNonNegativeNumber, MakeSizeAlgorithmFromSizeFunction, ValidateAndNormalizeHighWaterMark} from "./queue";
+import {IsNonNegativeNumber, MakeSizeAlgorithmFromSizeFunction, ValidateAndNormalizeHighWaterMark} from "./misc.ts";
 import {defer} from "./defer";
 
 export type UnderlyingSource = {
@@ -269,7 +269,7 @@ export function ReadableStreamClose(stream: ReadableStream) {
     reader.closedPromise.resolve(void 0);
 }
 
-export function ReadableStreamCreateReadResult(value, done: boolean, forAuthorCode: boolean) {
+export function ReadableStreamCreateReadResult(value, done: boolean, forAuthorCode: boolean): {value: any, done: boolean} {
     const ret = forAuthorCode ? Object.create({}) : Object.create(null);
     ret["value"] = value;
     ret["done"] = done;
@@ -325,7 +325,7 @@ export function ReadableStreamHasBYOBReader(stream: ReadableStream): boolean {
     if (reader === void 0) {
         return false;
     }
-    return IsReadableStreamDefaultReader(reader);
+    return IsReadableStreamBYOBReader(reader);
 }
 
 export function ReadableStreamHasDefaultReader(stream): boolean {
@@ -333,5 +333,5 @@ export function ReadableStreamHasDefaultReader(stream): boolean {
     if (reader === void 0) {
         return false;
     }
-    return IsReadableStreamBYOBReader(reader);
+    return IsReadableStreamDefaultReader(reader);
 }

@@ -6,15 +6,15 @@ import {
     ReadableStreamCreateReadResult,
     UnderlyingSource
 } from "./readable_stream.ts";
-import {ReadableByteStreamController} from "./readable_stream_controller";
-import {defer, Defer, rejectDefer} from "./defer";
-import {Assert} from "./util";
+import {ReadableByteStreamController} from "./readable_stream_controller.ts";
+import {defer, Defer, rejectDefer} from "./defer.ts";
+import {Assert} from "./util.ts";
 import {
     CreateAlgorithmFromUnderlyingMethod,
     InvokeOrNoop,
     ResetQueue,
     ValidateAndNormalizeHighWaterMark
-} from "./queue";
+} from "./misc.ts";
 
 interface ReadableStreamReader {
     readonly closed: Promise<undefined>

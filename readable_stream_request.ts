@@ -1,10 +1,10 @@
-import { ReadableByteStreamController } from "./readable_stream_controller";
+import { ReadableByteStreamController } from "./readable_stream_controller.ts";
 import {
   IsReadableStreamBYOBRequest,
   ReadableByteStreamControllerRespond,
   ReadableByteStreamControllerRespondWithNewView
-} from "./readable_stream_reader";
-import { IsDetachedBuffer } from "./misc";
+} from "./readable_stream_reader.ts";
+import { IsDetachedBuffer } from "./misc.ts";
 
 export class ReadableStreamBYOBRequest {
   constructor() {

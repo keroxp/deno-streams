@@ -2,7 +2,7 @@ import { Assert } from "./util.ts";
 import { UnderlyingSource } from "./readable_stream.ts";
 
 export interface Queueable {
-  queue: [];
+  queue: any[];
   queueTotalSize: number;
 }
 
@@ -104,9 +104,10 @@ export function PromiseCall(F: { call: (o, ...args) => any }, V, ...args) {
   }
 }
 
-export function TransferArrayBuffer(O) {
+export function TransferArrayBuffer(O: ArrayBuffer): ArrayBuffer {
   Assert(typeof O === "object");
-  Assert(O.hasOwnProperty("ArrayBufferData"));
+  // TODO: native transferring needed
+  return O;
 }
 
 export function ValidateAndNormalizeHighWaterMark(highWaterMark?: number) {
@@ -121,7 +122,7 @@ export function ValidateAndNormalizeHighWaterMark(highWaterMark?: number) {
 
 export function MakeSizeAlgorithmFromSizeFunction(size?: (chunk) => number) {
   if (size === void 0) {
-    return chunk => 1;
+    return _ => 1;
   }
   if (typeof size.call !== "function") {
     throw new TypeError();

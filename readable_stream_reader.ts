@@ -16,7 +16,10 @@ import {
   ReadableStreamReadResult,
   UnderlyingSource
 } from "./readable_stream.ts";
-import { ReadableByteStreamController } from "./readable_stream_controller.ts";
+import {
+  ReadableByteStreamController,
+  ReadableStreamDefaultController
+} from "./readable_stream_controller.ts";
 import { defer, Defer, rejectDefer } from "./defer.ts";
 import { Assert } from "./util.ts";
 import {
@@ -27,11 +30,11 @@ import {
   TransferArrayBuffer,
   ValidateAndNormalizeHighWaterMark
 } from "./misc.ts";
-import { ReadableStreamBYOBRequest } from "./readable_stream_request";
+import { ReadableStreamBYOBRequest } from "./readable_stream_request.ts";
 import {
   PullIntoDescriptor,
   ReadableStreamDefaultControllerError
-} from "./readable_stream_controller";
+} from "./readable_stream_controller.ts";
 
 export class ReadableStreamDefaultReader {
   readRequests: { promise: Defer<any>; forAuthorCode }[];
@@ -215,7 +218,7 @@ export function ReadableStreamReaderGenericRelease(
     reader.closedPromise = rejectDefer(new TypeError());
   }
   reader.ownerReadableStream.reader = void 0;
-  reader.ownerReadableStream = 0;
+  reader.ownerReadableStream = void 0;
 }
 
 export function ReadableStreamBYOBReaderRead(
@@ -234,7 +237,7 @@ export function ReadableStreamBYOBReaderRead(
   }
   Assert(stream.state === "readable");
   return ReadableByteStreamControllerPullInto(
-    stream.readableStreamController,
+    stream.readableStreamController as ReadableByteStreamController,
     view,
     forAuthorCode
   );
@@ -288,7 +291,7 @@ export function ReadableByteStreamControllerCallPullIfNeeded(
   Assert(!controller.pullAgain);
   controller.pulling = true;
   controller
-    .pullAlgorithm()
+    .pullAlgorithm(controller)
     .then(() => {
       controller.pulling = false;
       if (controller.pullAgain) {
@@ -297,7 +300,7 @@ export function ReadableByteStreamControllerCallPullIfNeeded(
       }
     })
     .catch(r => {
-      ReadableStreamDefaultControllerError(controller, r);
+      ReadableByteStreamControllerError(controller, r);
     });
 }
 
@@ -445,7 +448,7 @@ export function ReadableByteStreamControllerError(
   ReadableByteStreamControllerClearPendingPullIntos(controller);
   ResetQueue(controller);
   ReadableByteStreamControllerClearAlgorithms(controller);
-  ReadableStreamError(controller);
+  ReadableStreamError(controller.controlledReadableByteStream, e);
 }
 
 export function ReadableByteStreamControllerFillHeadPullIntoDescriptor(
@@ -491,9 +494,18 @@ export function ReadableByteStreamControllerFillPullIntoDescriptorFromQueue(
     );
     const destStart =
       pullIntoDescriptor.byteOffset + pullIntoDescriptor.bytesFilled;
+    const srcView = new DataView(
+      headOfQueue.buffer,
+      headOfQueue.byteOffset,
+      headOfQueue.byteLength
+    );
+    const destView = new DataView(
+      pullIntoDescriptor.buffer,
+      destStart,
+      bytesToCopy
+    );
     for (let i = 0; i < bytesToCopy; i++) {
-      pullIntoDescriptor.buffer.ArrayBufferData[destStart + i] =
-        headOfQueue.buffer.ArrayBufferData[headOfQueue.byteOffset + i];
+      destView[i] = srcView[i];
     }
     if (headOfQueue.byteLength === bytesToCopy) {
       queue.shift();
@@ -549,9 +561,9 @@ export function ReadableByteStreamControllerInvalidateBYOBRequest(
   if (controller.byobRequest === void 0) {
     return;
   }
-  controller.byobRequest.associatedReadableByteStreamController = void 0;
-  controller.byobRequest.view = void 0;
-  controller.byobRequest = void 0;
+  controller._byobRequest.associatedReadableByteStreamController = void 0;
+  controller._byobRequest._view = void 0;
+  controller._byobRequest = void 0;
 }
 
 export function ReadableByteStreamControllerProcessPullIntoDescriptorsUsingQueue(
@@ -712,14 +724,13 @@ export function ReadableByteStreamControllerRespondInReadableState(
     const remainder = CloneArrayBuffer(
       pullIntoDescriptor.buffer,
       end - remainderSize,
-      remainderSize,
-      ArrayBuffer
+      remainderSize
     );
     ReadableByteStreamControllerEnqueueChunkToQueue(
       controller,
-      remainderSize,
+      remainder,
       0,
-      remainder.ByteLength
+      remainder.byteLength
     );
   }
   pullIntoDescriptor.buffer = TransferArrayBuffer(pullIntoDescriptor.buffer);
@@ -735,12 +746,15 @@ export function ReadableByteStreamControllerRespondInReadableState(
 function CloneArrayBuffer(
   srcBuffer: ArrayBuffer,
   srcByteOffset: number,
-  srcLength: number,
-  cloneCtor
-) {
-  const ret = new cloneCtor(srcLength);
-  const view = new DataView(ret);
-  //???
+  srcLength: number
+): ArrayBuffer {
+  const ret = new ArrayBuffer(srcLength);
+  const retView = new DataView(ret);
+  const srcView = new DataView(srcBuffer, srcByteOffset, srcLength);
+  for (let i = 0; i < srcLength; i++) {
+    retView[i] = srcView[i];
+  }
+  return ret;
 }
 
 export function ReadableByteStreamControllerRespondInternal(
@@ -882,7 +896,7 @@ export function SetUpReadableByteStreamControllerFromUnderlyingSource(
   highWaterMark: number
 ) {
   Assert(underlyingByteSource !== void 0);
-  const controller = new ReadableByteStreamController();
+  const controller = Object.create(ReadableByteStreamController.prototype);
   const startAlgorithm = () =>
     InvokeOrNoop(underlyingByteSource, "start", controller);
   const pullAlgorithm = CreateAlgorithmFromUnderlyingMethod(
@@ -923,5 +937,5 @@ export function SetUpReadableStreamBYOBRequest(
   Assert(view.hasOwnProperty("ViewedArrayBuffer"));
   Assert(view.ViewedArrayBuffer !== null);
   request.associatedReadableByteStreamController = controller;
-  request.view = view;
+  request._view = view;
 }

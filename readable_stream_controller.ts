@@ -1,7 +1,6 @@
-import {Assert} from "./util.ts";
+import { Assert } from "./util.ts";
 import {
   IsReadableByteStreamController,
-  IsReadableStreamDefaultController,
   ReadableByteStreamControllerCallPullIfNeeded,
   ReadableByteStreamControllerClearAlgorithms,
   ReadableByteStreamControllerClose,
@@ -9,10 +8,9 @@ import {
   ReadableByteStreamControllerError,
   ReadableByteStreamControllerGetDesiredSize,
   ReadableByteStreamControllerHandleQueueDrain,
-  SetUpReadableByteStreamController,
   SetUpReadableStreamBYOBRequest
 } from "./readable_stream_reader.ts";
-import {ReadableStreamBYOBRequest} from "./readable_stream_request.ts";
+import { ReadableStreamBYOBRequest } from "./readable_stream_request.ts";
 import {
   CancelAlgorithm,
   IsReadableStreamLocked,
@@ -30,15 +28,17 @@ import {
   StartAlgorithm,
   UnderlyingSource
 } from "./readable_stream.ts";
+
 import {
   CreateAlgorithmFromUnderlyingMethod,
+  DequeueValue,
+  EnqueueValueWithSize,
   InvokeOrNoop,
   ResetQueue
-} from "./queue.ts";
-import {DequeueValue, EnqueueValueWithSize} from "./misc";
+} from "./misc.ts";
 
 export type PullIntoDescriptor = {
-  buffer: { ArrayBufferData; ViewedArrayBuffer: ArrayBuffer };
+  buffer: ArrayBuffer;
   byteOffset: number;
   bytesFilled: number;
   byteLength: number;
@@ -60,10 +60,9 @@ abstract class ReadableStreamControllerBase {
   pulling: boolean;
   pendingPullIntos: PullIntoDescriptor[];
   queue: {
-    buffer: { ArrayBufferData; ViewedArrayBuffer };
+    buffer: ArrayBuffer;
     byteLength: number;
     byteOffset: number;
-    byteFilled: number;
   }[];
   queueTotalSize;
   started: boolean;
@@ -79,14 +78,14 @@ export class ReadableByteStreamController extends ReadableStreamControllerBase {
   }
 
   controlledReadableByteStream: ReadableStream;
-  private _byobRequest: ReadableStreamBYOBRequest;
+  _byobRequest: ReadableStreamBYOBRequest;
   get byobRequest(): ReadableStreamBYOBRequest {
     if (!IsReadableByteStreamController(this)) {
       throw new TypeError();
     }
     if (this._byobRequest === void 0 && this.pendingPullIntos.length > 0) {
       const firstDescriptor = this.pendingPullIntos[0];
-      const {buffer, byteOffset, bytesFilled, byteLength} = firstDescriptor;
+      const { buffer, byteOffset, bytesFilled, byteLength } = firstDescriptor;
       const view = new Uint8Array(
         buffer,
         byteOffset + bytesFilled,
@@ -106,7 +105,7 @@ export class ReadableByteStreamController extends ReadableStreamControllerBase {
     return ReadableByteStreamControllerGetDesiredSize(this);
   }
 
-  close() {
+  close(): void {
     if (!IsReadableByteStreamController(this)) {
       throw new TypeError();
     }
@@ -119,7 +118,7 @@ export class ReadableByteStreamController extends ReadableStreamControllerBase {
     ReadableByteStreamControllerClose(this);
   }
 
-  enqueue(chunk: { ViewedArrayBuffer }) {
+  enqueue(chunk: ArrayBuffer): void {
     if (!IsReadableByteStreamController(this)) {
       throw new TypeError();
     }
@@ -135,16 +134,16 @@ export class ReadableByteStreamController extends ReadableStreamControllerBase {
     if (!chunk.hasOwnProperty("ViewedArrayBuffer")) {
       throw new TypeError();
     }
-    if (
-      chunk.ViewedArrayBuffer.hasOwnProperty("ArrayBufferData") &&
-      chunk.ViewedArrayBuffer["ArrayBufferData"] === null
-    ) {
-      throw new TypeError();
-    }
-    return ReadableByteStreamControllerEnqueue(this, chunk);
+    // if (
+    //   chunk.ViewedArrayBuffer.hasOwnProperty("ArrayBufferData") &&
+    //   chunk.ViewedArrayBuffer["ArrayBufferData"] === null
+    // ) {
+    //   throw new TypeError();
+    // }
+    ReadableByteStreamControllerEnqueue(this, chunk);
   }
 
-  error(e) {
+  error(e): void {
     if (!IsReadableByteStreamController(this)) {
       throw new TypeError();
     }
@@ -171,9 +170,11 @@ export class ReadableByteStreamController extends ReadableStreamControllerBase {
         entry.byteOffset,
         entry.byteLength
       );
-      return ReadableStreamCreateReadResult(view, false, forAuthorCode);
+      return Promise.resolve(
+        ReadableStreamCreateReadResult(view, false, forAuthorCode)
+      );
     }
-    const {autoAllocateChunkSize} = this;
+    const { autoAllocateChunkSize } = this;
     if (autoAllocateChunkSize !== void 0) {
       let buffer: ArrayBuffer;
       try {
@@ -214,7 +215,7 @@ export class ReadableStreamDefaultController extends ReadableStreamControllerBas
     return ReadableStreamDefaultControllerGetDesiredSize(this);
   }
 
-  close() {
+  close(): void {
     if (!IsReadableStreamDefaultController(this)) {
       throw new TypeError();
     }
@@ -224,7 +225,7 @@ export class ReadableStreamDefaultController extends ReadableStreamControllerBas
     ReadableStreamDefaultControllerClose(this);
   }
 
-  enqueue(chunk) {
+  enqueue(chunk): void {
     if (!IsReadableStreamDefaultController(this)) {
       throw new TypeError();
     }
@@ -234,11 +235,11 @@ export class ReadableStreamDefaultController extends ReadableStreamControllerBas
     return ReadableStreamDefaultControllerEnqueue(this, chunk);
   }
 
-  error(e) {
+  error(e): void {
     if (!IsReadableStreamDefaultController(this)) {
       throw new TypeError();
     }
-    return ReadableStreamDefaultControllerError(this, e);
+    ReadableStreamDefaultControllerError(this, e);
   }
 
   CancelSteps(reason): Promise<any> {
@@ -268,6 +269,12 @@ export class ReadableStreamDefaultController extends ReadableStreamControllerBas
   }
 }
 
+export function IsReadableStreamDefaultController(
+  x
+): x is ReadableStreamDefaultController {
+  return typeof x === "object" && x.hasOwnProperty("controlledReadableStream");
+}
+
 export function ReadableStreamDefaultControllerCallPullIfNeeded(
   controller: ReadableStreamDefaultController
 ) {
@@ -282,7 +289,7 @@ export function ReadableStreamDefaultControllerCallPullIfNeeded(
   Assert(!controller.pullAgain);
   controller.pulling = true;
   controller
-    .pullAlgorithm()
+    .pullAlgorithm(controller)
     .then(() => {
       controller.pulling = false;
       if (controller.pullAgain) {
@@ -422,7 +429,7 @@ export function SetUpReadableStreamDefaultController(params: {
     pullAlgorithm,
     cancelAlgorithm
   } = params;
-  let {highWaterMark, sizeAlgorithm} = params;
+  let { highWaterMark, sizeAlgorithm } = params;
   Assert(stream.readableStreamController === void 0);
   controller.controlledReadableStream = stream;
   controller.queue = void 0;
@@ -437,7 +444,7 @@ export function SetUpReadableStreamDefaultController(params: {
   controller.pullAlgorithm = pullAlgorithm;
   controller.cancelAlgorithm = cancelAlgorithm;
   stream.readableStreamController = controller;
-  startAlgorithm()
+  startAlgorithm(controller)
     .then(() => {
       controller.started = true;
       Assert(controller.pulling == false);
@@ -455,9 +462,9 @@ export function SetUpReadableStreamDefaultControllerFromUnderlyingSource(params:
   highWaterMark: number;
   sizeAlgorithm: SizeAlgorithm;
 }) {
-  const {stream, underlyingSource, highWaterMark, sizeAlgorithm} = params;
+  const { stream, underlyingSource, highWaterMark, sizeAlgorithm } = params;
   Assert(underlyingSource !== void 0);
-  const controller = new ReadableStreamDefaultController();
+  const controller =  Object.create(ReadableStreamDefaultController.prototype);
   const startAlgorithm = () =>
     InvokeOrNoop(underlyingSource, "start", controller);
   const pullAlgorithm = CreateAlgorithmFromUnderlyingMethod(
@@ -478,6 +485,6 @@ export function SetUpReadableStreamDefaultControllerFromUnderlyingSource(params:
     pullAlgorithm,
     cancelAlgorithm,
     highWaterMark,
-    sizeAlgorithm,
+    sizeAlgorithm
   });
 }

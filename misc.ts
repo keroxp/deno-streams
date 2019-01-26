@@ -2,7 +2,7 @@ import {Assert} from "./util.ts";
 import {UnderlyingSource} from "./readable_stream.ts";
 
 export interface Queueable {
-    queue: { value: any, size: number }[],
+    queue: [],
     queueTotalSize: number
 }
 
@@ -121,4 +121,8 @@ export function MakeSizeAlgorithmFromSizeFunction(size?: (chunk) => number) {
         throw new TypeError()
     }
     return (chunk) => size.call(void 0, chunk)
+}
+
+export function IsDetachedBuffer(v): boolean {
+    return false;
 }

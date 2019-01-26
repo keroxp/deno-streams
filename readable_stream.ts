@@ -2,7 +2,7 @@ import {
     IsReadableStreamBYOBReader,
     IsReadableStreamDefaultReader,
     ReadableStreamBYOBReader,
-    ReadableStreamDefaultReader,
+    ReadableStreamDefaultReader, ReadableStreamDefaultReaderRead,
     SetUpReadableByteStreamController,
     SetUpReadableByteStreamControllerFromUnderlyingSource
 } from "./readable_stream_reader";
@@ -10,6 +10,9 @@ import {Assert} from "./util";
 import {
     ReadableByteStreamController,
     ReadableStreamDefaultController,
+    ReadableStreamDefaultControllerClose,
+    ReadableStreamDefaultControllerEnqueue,
+    ReadableStreamDefaultControllerError,
     SetUpReadableStreamDefaultController,
     SetUpReadableStreamDefaultControllerFromUnderlyingSource,
 } from "./readable_stream_controller";
@@ -19,9 +22,9 @@ import {defer} from "./defer";
 export type UnderlyingSource = {
     type?: string,
     autoAllocateChunkSize?: number
-    startAlgorithm?: (controller: ReadableByteStreamController | ReadableStreamDefaultController) => any
-    pullAlgorithm?: (argCount: number, controller: ReadableByteStreamController | ReadableStreamDefaultController) => Promise<void>
-    cancelAlgorithm?(reason)
+    startAlgorithm?: StartAlgorithm
+    pullAlgorithm?: PullAlgorithm
+    cancelAlgorithm?: CancelAlgorithm
 }
 
 export type Strategy = {
@@ -29,24 +32,14 @@ export type Strategy = {
     highWaterMark?: number
 }
 
-interface ReadableStreamIface {
+export type StartAlgorithm = () => Promise<any>
+export type PullAlgorithm = () => Promise<any>
+export type CancelAlgorithm = (reason) => Promise<any>
+export type SizeAlgorithm<T = any> = (chunk: T) => number
 
-    readonly locked
+export type ReadableStreamReadResult = {value, done: boolean}
 
-    cancel(reason)
-
-    getReader(params?: {mode: string})
-
-    pipeThrough({writable, readable}, options)
-
-    pipeTo(dest, parmas: { preventClose, preventAbort, preventCancel, signal })
-
-    tee()
-}
-
-
-export class ReadableStream implements ReadableStreamIface {
-
+export class ReadableStream {
     constructor(private readonly underlyingSource: UnderlyingSource, strategy: Strategy) {
         InitializeReadableStream(this);
         let {highWaterMark, size} = strategy;
@@ -91,7 +84,7 @@ export class ReadableStream implements ReadableStreamIface {
         return ReadableStreamCancel(this, reason)
     }
 
-    getReader(params: {mode?: string} = {}) {
+    getReader(params: { mode?: string } = {}): ReadableStreamDefaultReader | ReadableStreamBYOBReader {
         if (!IsReadableStream(this)) {
             throw new TypeError()
         }
@@ -110,10 +103,15 @@ export class ReadableStream implements ReadableStreamIface {
         }
     }
 
-    pipeTo(dest, p: {preventClose, preventAbort, preventCancel, signal}) {
+    pipeTo(dest, p: { preventClose, preventAbort, preventCancel, signal }) {
     }
 
     tee() {
+        if (!IsReadableStream(this)) {
+            throw new TypeError()
+        }
+        const branches = ReadableStreamTee(this, false)
+        return [...branches]
     }
 
     disturbed: boolean;
@@ -132,11 +130,11 @@ function AcquireReadableStreamDefaultReader(stream: ReadableStream): ReadableStr
 }
 
 function CreateReadableStreamInternal(params: {
-    startAlgorithm: () => Promise<void>,
-    pullAlgorithm: () => Promise<void>,
-    cancelAlgorithm: () => Promise<void>,
+    startAlgorithm: StartAlgorithm,
+    pullAlgorithm: PullAlgorithm,
+    cancelAlgorithm: CancelAlgorithm,
     highWaterMark?: number,
-    sizeAlgorithm?: () => number
+    sizeAlgorithm?: SizeAlgorithm
     autoAllocateChunkSize?: number
 }, bytes: boolean): ReadableStream {
     const {startAlgorithm, pullAlgorithm, cancelAlgorithm, autoAllocateChunkSize} = params;
@@ -169,22 +167,22 @@ function CreateReadableStreamInternal(params: {
     return stream;
 }
 
-function CreateReadableStream(params: {
-    startAlgorithm: () => Promise<void>,
-    pullAlgorithm: () => Promise<void>,
-    cancelAlgorithm: () => Promise<void>,
+export function CreateReadableStream(params: {
+    startAlgorithm: StartAlgorithm,
+    pullAlgorithm: PullAlgorithm
+    cancelAlgorithm: CancelAlgorithm
     highWaterMark?: number,
-    sizeAlgorithm?: () => number
+    sizeAlgorithm?: SizeAlgorithm
 }): ReadableStream {
     return CreateReadableStreamInternal(params, false)
 }
 
 export function CreateReadableByteStream(params: {
-    startAlgorithm: () => Promise<void>,
-    pullAlgorithm: () => Promise<void>,
-    cancelAlgorithm: () => Promise<void>,
+    startAlgorithm: StartAlgorithm,
+    pullAlgorithm: PullAlgorithm
+    cancelAlgorithm: CancelAlgorithm
     highWaterMark?: number,
-    sizeAlgorithm?: () => number
+    sizeAlgorithm?: SizeAlgorithm
 }) {
     return CreateReadableStreamInternal(params, true)
 }
@@ -210,7 +208,77 @@ export function IsReadableStreamLocked(stream: ReadableStream): boolean {
     return stream.reader !== void 0
 }
 
-export function ReadableStreamTee(stream, cloneForBranch2) {
+export function ReadableStreamTee(stream: ReadableStream, cloneForBranch2: boolean): [ReadableStream, ReadableStream] {
+    Assert(IsReadableStream(stream));
+    Assert(typeof cloneForBranch2 === "boolean");
+    const reader = AcquireReadableStreamDefaultReader(stream);
+    let closedOrErrored = false;
+    let canceled1 = false;
+    let canceled2 = false;
+    let reason1 = void 0;
+    let reason2 = void 0;
+    let branch1: ReadableStream = void 0;
+    let branch2: ReadableStream = void 0;
+    let cancelPromise = defer();
+    const pullAlgorithm: PullAlgorithm = () => {
+        return ReadableStreamDefaultReaderRead(reader).then((result: { value, done: boolean }) => {
+            Assert(typeof result === "object");
+            const {value, done} = result;
+            Assert(typeof done === "boolean");
+            if (done && !closedOrErrored) {
+                if (!canceled1) {
+                    ReadableStreamDefaultControllerClose(branch1.readableStreamController as ReadableStreamDefaultController);
+                }
+                if (!canceled2) {
+                    ReadableStreamDefaultControllerClose(branch2.readableStreamController as ReadableStreamDefaultController);
+                }
+            }
+            if (closedOrErrored) {
+                return;
+            }
+            let [value1, value2] = [value, value]
+            if (!canceled2 && cloneForBranch2) {
+                //value2 <- ?StructuredDeserialize( ? StructuredSerialize( value2 ), 現在の Realm Record )
+            }
+            if (!canceled1) {
+                ReadableStreamDefaultControllerEnqueue(branch1.readableStreamController as ReadableStreamDefaultController, value1)
+            }
+            if (!canceled2) {
+                ReadableStreamDefaultControllerEnqueue(branch1.readableStreamController as ReadableStreamDefaultController, value2)
+            }
+        })
+    }
+    const cancel1Algorithm: CancelAlgorithm = (reason) => {
+        canceled1 = true;
+        reason1 = reason;
+        if (canceled2) {
+            const compositeReason = [reason1, reason2];
+            const cancelResult = ReadableStreamCancel(stream, compositeReason);
+            cancelPromise.resolve(cancelResult);
+        }
+        return cancelPromise;
+    }
+    const cancel2Algorithm: CancelAlgorithm = (reason) => {
+        canceled2 = true;
+        reason2 = reason;
+        if (canceled1) {
+            const compositeReason = [reason1, reason2];
+            const cancelResult = ReadableStreamCancel(stream, compositeReason);
+            cancelPromise.resolve(cancelResult);
+        }
+        return cancelPromise;
+    }
+    const startAlgorithm: StartAlgorithm = () => void 0;
+    branch1 = CreateReadableStream({startAlgorithm, pullAlgorithm, cancelAlgorithm: cancel1Algorithm});
+    branch2 = CreateReadableStream({startAlgorithm, pullAlgorithm, cancelAlgorithm: cancel2Algorithm});
+    reader.closedPromise.catch(r => {
+        if (!closedOrErrored) {
+            ReadableStreamDefaultControllerError(branch1.readableStreamController as ReadableStreamDefaultController, r);
+            ReadableStreamDefaultControllerError(branch2.readableStreamController as ReadableStreamDefaultController, r);
+            closedOrErrored = true;
+        }
+    });
+    return [branch1, branch2]
 }
 
 export function ReadableStreamPipeTo(params: {
@@ -228,12 +296,11 @@ export function ReadableStreamAddReadIntoRequest(stream: ReadableStream, forAuth
     return promise;
 }
 
-export function ReadableStreamAddReadRequest(stream: ReadableStream, forAuthorCode) {
+export function ReadableStreamAddReadRequest(stream: ReadableStream, forAuthorCode): Promise<{ value, done: boolean }> {
     Assert(IsReadableStreamDefaultReader(stream.reader));
     const reader = stream.reader as ReadableStreamDefaultReader;
     Assert(stream.state === "readable" || stream.state === "closed");
-    // I can't understand...
-    const promise = defer();
+    const promise = defer<{ value, done: boolean }>();
     const readIntoRequest = {promise, forAuthorCode};
     reader.readRequests.push(readIntoRequest);
     return promise;
@@ -269,7 +336,7 @@ export function ReadableStreamClose(stream: ReadableStream) {
     reader.closedPromise.resolve(void 0);
 }
 
-export function ReadableStreamCreateReadResult(value, done: boolean, forAuthorCode: boolean): {value: any, done: boolean} {
+export function ReadableStreamCreateReadResult(value, done: boolean, forAuthorCode: boolean): { value: any, done: boolean } {
     const ret = forAuthorCode ? Object.create({}) : Object.create(null);
     ret["value"] = value;
     ret["done"] = done;
@@ -286,7 +353,7 @@ export function ReadableStreamError(stream: ReadableStream, e) {
         return
     }
     if (IsReadableStreamDefaultReader(reader)) {
-        for (const req of reader.readRequests){
+        for (const req of reader.readRequests) {
             req.promise.reject(e)
         }
         reader.readRequests = [];

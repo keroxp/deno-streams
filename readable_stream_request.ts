@@ -6,7 +6,14 @@ import {
 } from "./readable_stream_reader.ts";
 import { IsDetachedBuffer } from "./misc.ts";
 
-export class ReadableStreamBYOBRequest {
+export interface ReadableStreamBYOBRequest {
+  readonly view: Uint8Array;
+  respond(bytesWritten: number): void;
+  respondWithNewView(view: Uint8Array): void;
+}
+
+export class ReadableStreamBYOBRequestImpl
+  implements ReadableStreamBYOBRequest {
   constructor() {
     throw new TypeError();
   }
@@ -46,9 +53,9 @@ export class ReadableStreamBYOBRequest {
     if (typeof view !== "object") {
       throw new TypeError();
     }
-    if (view.hasOwnProperty("ViewedArrayBuffer")) {
-      throw new TypeError();
-    }
+    // if (view.hasOwnProperty("ViewedArrayBuffer")) {
+    //   throw new TypeError();
+    // }
     if (IsDetachedBuffer(this._view)) {
       throw new TypeError();
     }

@@ -17,8 +17,8 @@ import {
   UnderlyingSource
 } from "./readable_stream.ts";
 import {
-  ReadableByteStreamController,
-  ReadableStreamDefaultController
+  PullIntoDescriptor,
+  ReadableByteStreamController
 } from "./readable_stream_controller.ts";
 import { defer, Defer, rejectDefer } from "./defer.ts";
 import { Assert } from "./util.ts";
@@ -30,13 +30,22 @@ import {
   TransferArrayBuffer,
   ValidateAndNormalizeHighWaterMark
 } from "./misc.ts";
-import { ReadableStreamBYOBRequest } from "./readable_stream_request.ts";
 import {
-  PullIntoDescriptor,
-  ReadableStreamDefaultControllerError
-} from "./readable_stream_controller.ts";
+  ReadableStreamBYOBRequest,
+  ReadableStreamBYOBRequestImpl
+} from "./readable_stream_request.ts";
 
-export class ReadableStreamDefaultReader {
+export interface ReadableStreamReader {
+  readonly closed: Promise<any>;
+
+  cancel(reason): Promise<any>;
+
+  read(view?: ArrayBufferView): Promise<ReadableStreamReadResult>;
+
+  releaseLock(): Promise<any>;
+}
+
+export class ReadableStreamDefaultReader implements ReadableStreamReader {
   readRequests: { promise: Defer<any>; forAuthorCode }[];
 
   constructor(stream: ReadableStream) {
@@ -94,7 +103,7 @@ export class ReadableStreamDefaultReader {
   }
 }
 
-export class ReadableStreamBYOBReader {
+export class ReadableStreamBYOBReader implements ReadableStreamReader {
   readIntoRequests: { promise: Defer<any>; forAuthorCode: boolean }[];
 
   constructor(stream: ReadableStream) {
@@ -141,18 +150,18 @@ export class ReadableStreamBYOBReader {
     if (typeof view !== "object") {
       return Promise.reject(new TypeError());
     }
-    if (!view.hasOwnProperty("ViewedArrayBuffer")) {
-      return Promise.reject(new TypeError());
-    }
-    if (
-      view["ViewArrayBuffer"].hasOwnProperty("ArrayBufferData") &&
-      view.ViewedArrayBuffer["ArrayBufferData"] === null
-    ) {
-      return Promise.reject(new TypeError());
-    }
-    if (view["ByteLength"] === 0) {
-      return Promise.reject(new TypeError());
-    }
+    // if (!view.hasOwnProperty("ViewedArrayBuffer")) {
+    //   return Promise.reject(new TypeError());
+    // }
+    // if (
+    //   view["ViewArrayBuffer"].hasOwnProperty("ArrayBufferData") &&
+    //   view.ViewedArrayBuffer["ArrayBufferData"] === null
+    // ) {
+    //   return Promise.reject(new TypeError());
+    // }
+    // if (view["ByteLength"] === 0) {
+    //   return Promise.reject(new TypeError());
+    // }
     return ReadableStreamBYOBReaderRead(this, view, true);
   }
 
@@ -223,7 +232,7 @@ export function ReadableStreamReaderGenericRelease(
 
 export function ReadableStreamBYOBReaderRead(
   reader: ReadableStreamBYOBReader,
-  view,
+  view: ArrayBufferView,
   forAuthorCode?: boolean
 ) {
   if (forAuthorCode === void 0) {
@@ -376,12 +385,12 @@ export function ReadableByteStreamControllerConvertPullIntoDescriptor(
 
 export function ReadableByteStreamControllerEnqueue(
   controller: ReadableByteStreamController,
-  chunk
+  chunk: ArrayBufferView
 ) {
   const stream = controller.controlledReadableByteStream;
   Assert(controller.closeRequested === false);
   Assert(stream.state === "readable");
-  const buffer = chunk.ViewedArrayBuffer;
+  const { buffer } = chunk;
   const { byteOffset, byteLength } = chunk;
   const transferredBuffer = TransferArrayBuffer(buffer);
   if (ReadableStreamHasDefaultReader(stream)) {
@@ -393,7 +402,7 @@ export function ReadableByteStreamControllerEnqueue(
         byteLength
       );
     } else {
-      Assert(controller.queue.length === 0);
+      Assert(controller.queue.length === 0, "l=0");
       const transferredView = new Uint8Array(
         transferredBuffer,
         byteOffset,
@@ -412,7 +421,10 @@ export function ReadableByteStreamControllerEnqueue(
       controller
     );
   } else {
-    Assert(IsReadableStreamLocked(stream));
+    Assert(
+      IsReadableStreamLocked(stream) === false,
+      "stream should not be locked"
+    );
     ReadableByteStreamControllerEnqueueChunkToQueue(
       controller,
       transferredBuffer,
@@ -494,12 +506,12 @@ export function ReadableByteStreamControllerFillPullIntoDescriptorFromQueue(
     );
     const destStart =
       pullIntoDescriptor.byteOffset + pullIntoDescriptor.bytesFilled;
-    const srcView = new DataView(
+    const srcView = new Uint8Array(
       headOfQueue.buffer,
       headOfQueue.byteOffset,
       headOfQueue.byteLength
     );
-    const destView = new DataView(
+    const destView = new Uint8Array(
       pullIntoDescriptor.buffer,
       destStart,
       bytesToCopy
@@ -558,7 +570,7 @@ export function ReadableByteStreamControllerHandleQueueDrain(
 export function ReadableByteStreamControllerInvalidateBYOBRequest(
   controller: ReadableByteStreamController
 ) {
-  if (controller.byobRequest === void 0) {
+  if (controller._byobRequest === void 0) {
     return;
   }
   controller._byobRequest.associatedReadableByteStreamController = void 0;
@@ -590,7 +602,7 @@ export function ReadableByteStreamControllerProcessPullIntoDescriptorsUsingQueue
   }
 }
 
-const TypedArraySizemMap = {
+const TypedArraySizeMap = {
   Int8Array: [1, Int8Array],
   Uint8Array: [1, Uint8Array],
   Uint8ClampedArray: [1, Uint8ClampedArray],
@@ -604,18 +616,18 @@ const TypedArraySizemMap = {
 
 export function ReadableByteStreamControllerPullInto(
   controller: ReadableByteStreamController,
-  view,
+  view: ArrayBufferView,
   forAuthorCode?: boolean
 ): Promise<any> {
   const stream = controller.controlledReadableByteStream;
   let elementSize = 1;
   let ctor = DataView;
-  if (view.hasOwnProperty("TypedArrayName")) {
-    [elementSize, ctor] = TypedArraySizemMap[view["TypedArrayName"]];
+  const ctorName = view.constructor.name;
+  if (TypedArraySizeMap[ctorName]) {
+    [elementSize, ctor] = TypedArraySizeMap[ctorName];
   }
-  const byteOffset = view.ByteOffset;
-  const byteLength = view.ByteLength;
-  const buffer = TransferArrayBuffer(view.ViewedArrayBuffer);
+  const { byteOffset, byteLength } = view;
+  const buffer = TransferArrayBuffer(view.buffer);
   const pullIntoDescriptor: PullIntoDescriptor = {
     buffer,
     byteOffset,
@@ -878,7 +890,7 @@ export function SetUpReadableByteStreamController(params: {
   controller.autoAllocateChunkSize = autoAllocateChunkSize;
   controller.pendingPullIntos = [];
   stream.readableStreamController = controller;
-  startAlgorithm()
+  Promise.resolve(startAlgorithm())
     .then(() => {
       controller.started = true;
       Assert(!controller.pulling);
@@ -928,7 +940,7 @@ export function SetUpReadableByteStreamControllerFromUnderlyingSource(
 }
 
 export function SetUpReadableStreamBYOBRequest(
-  request: ReadableStreamBYOBRequest,
+  request: ReadableStreamBYOBRequestImpl,
   controller: ReadableByteStreamController,
   view
 ) {

@@ -45,7 +45,6 @@ export function PeekQueueValue(container: Queueable) {
 }
 
 export function ResetQueue(container: Queueable) {
-  Assert(isQueuable(container));
   container.queue = [];
   container.queueTotalSize = 0;
 }
@@ -81,7 +80,7 @@ export function InvokeOrNoop(O, P: string | symbol, ...args) {
   if (method === void 0) {
     return void 0;
   }
-  return method.call(O, args);
+  return method.call(O, ...args);
 }
 
 export function IsFiniteNonNegativeNumber(v) {

@@ -10,6 +10,7 @@ import {
 import { Assert } from "./util.ts";
 import {
   ReadableByteStreamController,
+  ReadableStreamController,
   ReadableStreamDefaultController,
   ReadableStreamDefaultControllerClose,
   ReadableStreamDefaultControllerEnqueue,
@@ -23,9 +24,10 @@ import {
   ValidateAndNormalizeHighWaterMark
 } from "./misc.ts";
 import { defer } from "./defer.ts";
+import { ReadableStreamReader } from "./readable_stream_reader.ts";
 
 export type UnderlyingSource = {
-  type?: string;
+  type?: "bytes";
   autoAllocateChunkSize?: number;
   start?: StartAlgorithm;
   pull?: PullAlgorithm;
@@ -37,11 +39,9 @@ export type Strategy = {
   highWaterMark?: number;
 };
 
-export type StartAlgorithm = (
-  controller: ReadableStreamDefaultController | ReadableByteStreamController
-) => Promise<any>;
+export type StartAlgorithm = (controller: ReadableStreamController) => any;
 export type PullAlgorithm = (
-  controller: ReadableByteStreamController | ReadableStreamDefaultController
+  controller: ReadableStreamController
 ) => Promise<any>;
 export type CancelAlgorithm = (reason) => Promise<any>;
 export type SizeAlgorithm = (chunk) => number;
@@ -49,10 +49,7 @@ export type SizeAlgorithm = (chunk) => number;
 export type ReadableStreamReadResult = { value; done: boolean };
 
 export class ReadableStream {
-  constructor(
-    underlyingSource: UnderlyingSource,
-    strategy: Strategy = {}
-  ) {
+  constructor(underlyingSource: UnderlyingSource, strategy: Strategy = {}) {
     InitializeReadableStream(this);
     let { highWaterMark, size } = strategy;
     const { type } = underlyingSource;
@@ -103,9 +100,7 @@ export class ReadableStream {
     return ReadableStreamCancel(this, reason);
   }
 
-  getReader(
-    params: { mode?: "byob" } = {}
-  ): ReadableStreamDefaultReader | ReadableStreamBYOBReader {
+  getReader(params: { mode?: "byob" } = {}): ReadableStreamReader {
     if (!IsReadableStream(this)) {
       throw new TypeError();
     }
@@ -126,12 +121,11 @@ export class ReadableStream {
 
   pipeTo(dest, p: { preventClose; preventAbort; preventCancel; signal }) {}
 
-  tee() {
+  tee(): [ReadableStream, ReadableStream] {
     if (!IsReadableStream(this)) {
       throw new TypeError();
     }
-    const branches = ReadableStreamTee(this, false);
-    return [...branches];
+    return ReadableStreamTee(this, false);
   }
 
   disturbed: boolean;

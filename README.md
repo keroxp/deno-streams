@@ -9,10 +9,14 @@ See: https://streams.spec.whatwg.org/
   - 🔰new ReadableSteram(underlyingSource = {}, strategy = {})
   - 🔰get locked
   - 🔰cancel(reason)
-  - ❌pipeThrough({ writable, readable }, { preventClose, preventAbort, preventCancel, signal } = {})
-  - ❌pipeTo(dest, { preventClose, preventAbort, preventCancel, signal } = {})
+  - 🔰pipeThrough({ writable, readable }, { preventClose, preventAbort, preventCancel, signal } = {})
+  - 🔰pipeTo(dest, { preventClose, preventAbort, preventCancel, signal } = {})
   - 🔰tee()
-- ❌WritableStream
+- 🔰WritableStream
+  - 🔰`new WritableStream( underlyingSink = {}, strategy = {} )`
+  - 🔰`get locked`
+  - 🔰`abort( reason )`
+  - 🔰`getWriter()`
 - ❌TransformStream
 - ❌ByteLengthQueuingStrategy
 - ❌CountQueuingStrategy

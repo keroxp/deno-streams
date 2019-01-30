@@ -33,10 +33,19 @@ export interface WritableStreamController {
 export const ErrorSteps = Symbol("ErrorSteps");
 export const AbortSteps = Symbol("AbortSteps");
 
+export function createWritableStreamDefaultController(): WritableStreamDefaultController {
+  const ret = Object.create(WritableStreamDefaultController.prototype);
+  ret[ErrorSteps] = () => ResetQueue(ret);
+  ret[AbortSteps] = reason => {
+    const result = ret.abortAlgorithm(reason);
+    WritableStreamDefaultControllerClearAlgorithms(ret);
+    return result;
+  };
+  return ret;
+}
+
 export class WritableStreamDefaultController
   implements WritableStreamController {
-  [ErrorSteps]: () => Promise<any>;
-  [AbortSteps]: (reason) => Promise<any>;
   abortAlgorithm: AbortAlgorithm;
   closeAlgorithm: CloseAlgorithm;
   controlledWritableStream: WritableStream;
@@ -90,7 +99,7 @@ export function SetUpWritableStreamDefaultController(params: {
     sizeAlgorithm
   } = params;
   Assert(IsWritableStream(stream));
-  Assert(stream.writableStreamController !== void 0);
+  Assert(stream.writableStreamController === void 0);
   controller.controlledWritableStream = stream;
   stream.writableStreamController = controller;
   ResetQueue(controller);
@@ -124,7 +133,7 @@ export function SetUpWritableStreamDefaultControllerFromUnderlyingSink(
   sizeAlgorithm: SizeAlgorithm
 ) {
   Assert(underlyingSink !== void 0);
-  const controller = Object.create(WritableStreamDefaultController.prototype);
+  const controller = createWritableStreamDefaultController();
   const startAlgorithm = () =>
     InvokeOrNoop(underlyingSink, "start", controller);
   const writeAlgorithm = CreateAlgorithmFromUnderlyingMethod(

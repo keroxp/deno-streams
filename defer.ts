@@ -2,7 +2,7 @@ export const PromiseState = Symbol("PromiseState");
 export type Defer<T> = {
   resolve(t?: T);
   reject(e?);
-  [PromiseState]: "rejected" | "pending" | "resolved";
+  [PromiseState]: string;
 } & Promise<T>;
 
 export function defer<T>(): Defer<T> {
@@ -11,17 +11,16 @@ export function defer<T>(): Defer<T> {
     res = resolve;
     rej = reject;
   });
-  return Object.assign(promise, {
-    resolve: (...args) => {
-      res(...args);
-      this[PromiseState] = "resolved";
-    },
-    reject: (...args) => {
-      rej(...args);
-      this[PromiseState] = "rejected";
-    },
-    [PromiseState]: "pending" as "pending"
-  });
+  const src = { resolve: null, reject: null, [PromiseState]: "pending" };
+  src.resolve = (...args) => {
+    res(...args);
+    src[PromiseState] = "resolved";
+  };
+  src.reject = (...args) => {
+    rej(...args);
+    src[PromiseState] = "rejected";
+  };
+  return Object.assign(promise, src);
 }
 
 export function rejectDefer<T>(e): Defer<T> {

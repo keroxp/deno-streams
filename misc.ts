@@ -31,8 +31,8 @@ export function EnqueueValueWithSize(
   size: number
 ) {
   Assert(isQueuable(container));
-  if (Number.isFinite(size) || size < 0) {
-    throw new RangeError();
+  if (!Number.isFinite(size) || size < 0) {
+    throw new RangeError("invalid size: " + size);
   }
   container.queue.push({ value, size });
   container.queueTotalSize += size;

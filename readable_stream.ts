@@ -507,12 +507,12 @@ export async function ReadableStreamPipeTo({
         });
       }
       shutdown(error, () => Promise.all(actions.map(p => p())));
+      if (signal.aborted) {
+        abortAlgorithm();
+        return promsie;
+      }
+      signal.addEventListener("onabort", abortAlgorithm);
     };
-    if (signal.aborted) {
-      abortAlgorithm();
-      return promsie;
-    }
-    signal.addEventListener("onabort", abortAlgorithm);
   }
   const finalize = (error?) => {
     WritableStreamDefaultWriterRelease(writer);
@@ -598,7 +598,6 @@ export async function ReadableStreamPipeTo({
         await writer.write(value);
       }
     }
-    finalize();
   })();
   return promsie;
 }

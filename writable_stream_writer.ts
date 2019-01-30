@@ -161,13 +161,16 @@ export function WritableStreamDefaultWriterAbort(
   return WritableStreamAbort(writer.ownerWritableStream, reason);
 }
 
-export function WritableStreamDefaultWriterClose(
+export async function WritableStreamDefaultWriterClose(
   writer: WritableStreamDefaultWriter
 ): Promise<any> {
   const stream = writer.ownerWritableStream;
   Assert(stream !== void 0);
   const { state } = stream;
-  Assert(state === "closed" || state === "erroring");
+  if (state === "closed" || state === "errored") {
+    throw new TypeError(`stream is ${state}`);
+  }
+  Assert(state === "writable" || state === "erroring");
   Assert(!WritableStreamCloseQueuedOrInFlight(stream));
   const promise = defer();
   stream.closeRequest = promise;
@@ -236,8 +239,8 @@ export function WritableStreamDefaultWriterRelease(
   writer: WritableStreamDefaultWriter
 ) {
   const stream = writer.ownerWritableStream;
-  Assert(stream !== void 0);
-  Assert(stream.writer === writer);
+  Assert(stream !== void 0, "stream is undefined");
+  Assert(stream.writer === writer, "writer is not identical");
   const releasedError = new TypeError();
   WritableStreamDefaultWriterEnsureReadyPromiseRejected(writer, releasedError);
   WritableStreamDefaultWriterEnsureClosedPromiseRejected(writer, releasedError);

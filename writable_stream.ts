@@ -13,15 +13,16 @@ import {
 import { Assert } from "./util.ts";
 import {
   AbortSteps,
+  createWritableStreamDefaultController,
   ErrorSteps,
   SetUpWritableStreamDefaultController,
   SetUpWritableStreamDefaultControllerFromUnderlyingSink,
   WritableStreamDefaultController
 } from "./writable_stream_controller.ts";
 
-export type WriteAlgorithm = (chunk) => Promise<any>;
-export type CloseAlgorithm = () => Promise<any>;
-export type AbortAlgorithm = (reason) => Promise<any>;
+export type WriteAlgorithm = (chunk) => any;
+export type CloseAlgorithm = () => any;
+export type AbortAlgorithm = (reason) => any;
 
 export class WritableStream {
   constructor(
@@ -30,18 +31,18 @@ export class WritableStream {
       write?: WriteAlgorithm;
       close?: CloseAlgorithm;
       abort?: AbortAlgorithm;
-      type: string;
+      type?: string;
     },
     strategy: {
-      highWaterMark: number;
-      size: SizeAlgorithm;
-    }
+      highWaterMark?: number;
+      size?: SizeAlgorithm;
+    } = {}
   ) {
     InitializeWritableStream(this);
     let { size, highWaterMark } = strategy;
     const { type } = underlyingSink;
     if (type !== void 0) {
-      throw new RangeError("type is undefined");
+      throw new RangeError("type should not be specified yet");
     }
     const sizeAlgorithm = MakeSizeAlgorithmFromSizeFunction(size);
     if (highWaterMark === void 0) {
@@ -127,7 +128,7 @@ export function CreateWritableStream(params: {
   Assert(IsNonNegativeNumber(highWaterMark));
   const stream = Object.create(WritableStream.prototype);
   InitializeWritableStream(stream);
-  const controller = Object.create(WritableStreamDefaultController.prototype);
+  const controller = createWritableStreamDefaultController();
   SetUpWritableStreamDefaultController({
     stream,
     controller,

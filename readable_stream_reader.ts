@@ -224,7 +224,7 @@ export function ReadableStreamReaderGenericRelease(
   if (reader.ownerReadableStream.state === "readable") {
     reader.closedPromise.reject(new TypeError());
   } else {
-    reader.closedPromise = rejectDefer(new TypeError());
+    reader.closedPromise.reject(new TypeError());
   }
   reader.ownerReadableStream.reader = void 0;
   reader.ownerReadableStream = void 0;
@@ -300,7 +300,7 @@ export function ReadableByteStreamControllerCallPullIfNeeded(
   Assert(!controller.pullAgain);
   controller.pulling = true;
   controller
-    .pullAlgorithm(controller)
+    .pullAlgorithm()
     .then(() => {
       controller.pulling = false;
       if (controller.pullAgain) {

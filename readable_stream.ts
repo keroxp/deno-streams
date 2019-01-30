@@ -1,13 +1,16 @@
 import {
+  IsReadableByteStreamController,
   IsReadableStreamBYOBReader,
   IsReadableStreamDefaultReader,
   ReadableStreamBYOBReader,
   ReadableStreamDefaultReader,
   ReadableStreamDefaultReaderRead,
+  ReadableStreamReader,
+  ReadableStreamReaderGenericRelease,
   SetUpReadableByteStreamController,
   SetUpReadableByteStreamControllerFromUnderlyingSource
 } from "./readable_stream_reader.ts";
-import { Assert } from "./util.ts";
+import { Assert, isAbortSignal } from "./util.ts";
 import {
   ReadableByteStreamController,
   ReadableStreamController,
@@ -24,13 +27,25 @@ import {
   ValidateAndNormalizeHighWaterMark
 } from "./misc.ts";
 import { defer } from "./defer.ts";
-import { ReadableStreamReader } from "./readable_stream_reader.ts";
+import {
+  AcquireWritableStreamDefaultWriter,
+  IsWritableStream,
+  IsWritableStreamLocked,
+  WritableStream,
+  WritableStreamAbort,
+  WritableStreamCloseQueuedOrInFlight
+} from "./writable_stream.ts";
+import {
+  WritableStreamDefaultWriterCloseWithErrorPropagation,
+  WritableStreamDefaultWriterGetDesiredSize,
+  WritableStreamDefaultWriterRelease
+} from "./writable_stream_writer.ts";
 
 export type UnderlyingSource = {
   type?: "bytes";
   autoAllocateChunkSize?: number;
-  start?: StartAlgorithm;
-  pull?: PullAlgorithm;
+  start?: (controller: ReadableStreamController) => any;
+  pull?: (controller: ReadableStreamController) => any;
   cancel?: CancelAlgorithm;
 };
 
@@ -39,10 +54,8 @@ export type Strategy = {
   highWaterMark?: number;
 };
 
-export type StartAlgorithm = (controller: ReadableStreamController) => any;
-export type PullAlgorithm = (
-  controller: ReadableStreamController
-) => Promise<any>;
+export type StartAlgorithm = () => any;
+export type PullAlgorithm = () => Promise<any>;
 export type CancelAlgorithm = (reason) => Promise<any>;
 export type SizeAlgorithm = (chunk) => number;
 
@@ -113,13 +126,99 @@ export class ReadableStream {
     throw new RangeError();
   }
 
-  pipeThrough({ writable, readable }, options) {
+  pipeThrough(
+    {
+      writable,
+      readable
+    }: {
+      writable: WritableStream;
+      readable: ReadableStream;
+    },
+    {
+      preventClose,
+      preventAbort,
+      preventCancel,
+      signal
+    }: {
+      preventClose?: boolean;
+      preventAbort?: boolean;
+      preventCancel?: boolean;
+      signal?: domTypes.AbortSignal;
+    } = {}
+  ) {
     if (!IsReadableStream(this)) {
-      throw new TypeError();
+      throw new TypeError("this is not ReadableStream");
     }
+    if (!IsWritableStream(writable)) {
+      throw new TypeError("writable is not WritableStream");
+    }
+    if (!IsReadableStream(readable)) {
+      throw new TypeError("readable is not ReadableStream");
+    }
+    preventClose = !!preventClose;
+    preventAbort = !!preventAbort;
+    preventCancel = !!preventCancel;
+    if (signal !== void 0 && !isAbortSignal(signal)) {
+      throw new TypeError("signal is not instance of AbortSignal");
+    }
+    if (IsReadableStreamLocked(this)) {
+      throw new TypeError("this stream is locked");
+    }
+    if (IsWritableStreamLocked(writable)) {
+      throw new TypeError("writable is locked");
+    }
+    ReadableStreamPipeTo({
+      source: this,
+      dest: writable,
+      preventClose,
+      preventAbort,
+      preventCancel,
+      signal
+    });
+    return readable;
   }
 
-  pipeTo(dest, p: { preventClose; preventAbort; preventCancel; signal }) {}
+  async pipeTo(
+    dest: WritableStream,
+    {
+      preventClose,
+      preventAbort,
+      preventCancel,
+      signal
+    }: {
+      preventClose?: boolean;
+      preventAbort?: boolean;
+      preventCancel?: boolean;
+      signal?;
+    } = {}
+  ): Promise<any> {
+    if (!IsReadableStream(this)) {
+      throw new TypeError("this is not ReadableStream");
+    }
+    if (!IsWritableStream(dest)) {
+      throw new TypeError("dest is not WritableStream");
+    }
+    preventClose = !!preventClose;
+    preventAbort = !!preventAbort;
+    preventCancel = !!preventCancel;
+    if (signal !== void 0 && !isAbortSignal(signal)) {
+      throw new TypeError("signal is not instance of AbortSignal");
+    }
+    if (IsReadableStreamLocked(this)) {
+      throw new TypeError("this stream is locked");
+    }
+    if (IsWritableStreamLocked(dest)) {
+      throw new TypeError("writable is locked");
+    }
+    return ReadableStreamPipeTo({
+      source: this,
+      dest,
+      preventClose,
+      preventCancel,
+      preventAbort,
+      signal
+    });
+  }
 
   tee(): [ReadableStream, ReadableStream] {
     if (!IsReadableStream(this)) {
@@ -356,14 +455,153 @@ export function ReadableStreamTee(
   return [branch1, branch2];
 }
 
-export function ReadableStreamPipeTo(params: {
-  source;
-  dest;
-  preventClose;
-  preventAbort;
-  preventCancel;
-  signal;
-}) {}
+export async function ReadableStreamPipeTo({
+  source,
+  dest,
+  preventClose,
+  preventAbort,
+  preventCancel,
+  signal
+}: {
+  source: ReadableStream;
+  dest: WritableStream;
+  preventClose: boolean;
+  preventAbort: boolean;
+  preventCancel: boolean;
+  signal?;
+}) {
+  Assert(IsReadableStream(source));
+  Assert(IsWritableStream(dest));
+  Assert(typeof preventCancel === "boolean");
+  Assert(typeof preventAbort === "boolean");
+  Assert(typeof preventClose === "boolean");
+  Assert(signal === void 0 || isAbortSignal(signal));
+  Assert(!IsReadableStreamLocked(source));
+  Assert(!IsWritableStreamLocked(dest));
+  let reader: ReadableStreamBYOBReader | ReadableStreamDefaultReader;
+  if (IsReadableByteStreamController(source.readableStreamController)) {
+    reader = AcquireReadableStreamBYOBReader(source);
+  } else {
+    reader = AcquireReadableStreamDefaultReader(source);
+  }
+  const writer = AcquireWritableStreamDefaultWriter(dest);
+  let shutingDown = false;
+  const promsie = defer();
+  let abortAlgorithm;
+  if (!signal) {
+    abortAlgorithm = () => {
+      let error = new Error("aborted");
+      const actions = [];
+      if (!preventAbort) {
+        actions.push(async () => {
+          if (dest.state === "writable") {
+            return WritableStreamAbort(dest, error);
+          }
+        });
+      }
+      if (!preventCancel) {
+        actions.push(async () => {
+          if (source.state === "readable") {
+            return ReadableStreamCancel(source, error);
+          }
+        });
+      }
+      shutdown(error, () => Promise.all(actions.map(p => p())));
+    };
+    if (signal.aborted) {
+      abortAlgorithm();
+      return promsie;
+    }
+    signal.addEventListener("onabort", abortAlgorithm);
+  }
+  const finalize = (error?) => {
+    WritableStreamDefaultWriterRelease(writer);
+    ReadableStreamReaderGenericRelease(reader);
+    if (signal) {
+      signal.removeEventListener("onabort", abortAlgorithm);
+    }
+    if (error) {
+      promsie.reject(error);
+    } else {
+      promsie.resolve();
+    }
+  };
+  const shutdown = (err?, action?: () => Promise<any>) => {
+    if (shutingDown) {
+      return;
+    }
+    shutingDown = true;
+    if (
+      dest.state === "writable" ||
+      !WritableStreamCloseQueuedOrInFlight(dest)
+    ) {
+    }
+    if (!action) {
+      finalize(err);
+      return;
+    }
+    action()
+      .then(() => finalize(err))
+      .catch(finalize);
+  };
+  (async () => {
+    while (true) {
+      const desiredSize = WritableStreamDefaultWriterGetDesiredSize(writer);
+      if (desiredSize === null || desiredSize <= 0) {
+        return;
+      }
+      if (source.state === "errored") {
+        if (!preventAbort) {
+          shutdown(source.storedError, () => {
+            return WritableStreamAbort(dest, source.storedError);
+          });
+        } else {
+          shutdown(source.storedError);
+        }
+      } else if (dest.state === "errored") {
+        if (!preventCancel) {
+          shutdown(dest.storedError, () => {
+            return ReadableStreamCancel(source, dest.storedError);
+          });
+        } else {
+          shutdown(dest.storedError);
+        }
+      } else if (source.state === "closed") {
+        if (!preventClose) {
+          shutdown(void 0, () => {
+            return WritableStreamDefaultWriterCloseWithErrorPropagation(writer);
+          });
+        } else {
+          shutdown();
+        }
+      } else if (
+        WritableStreamCloseQueuedOrInFlight(dest) ||
+        dest.state === "closed"
+      ) {
+        const destClosed = new TypeError();
+        if (!preventCancel) {
+          shutdown(destClosed, () => {
+            return ReadableStreamCancel(source, destClosed);
+          });
+        } else {
+          shutdown(destClosed);
+        }
+      }
+      if (IsReadableStreamBYOBReader(reader)) {
+        let view = new Uint8Array(desiredSize);
+        const { done } = await reader.read(view);
+        if (done) break;
+        await writer.write(view);
+      } else {
+        const { value, done } = await reader.read();
+        if (done) break;
+        await writer.write(value);
+      }
+    }
+    finalize();
+  })();
+  return promsie;
+}
 
 export function ReadableStreamAddReadIntoRequest(
   stream: ReadableStream,

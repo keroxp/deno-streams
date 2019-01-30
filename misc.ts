@@ -49,12 +49,12 @@ export function ResetQueue(container: Queueable) {
   container.queueTotalSize = 0;
 }
 
-export function CreateAlgorithmFromUnderlyingMethod(
+export function CreateAlgorithmFromUnderlyingMethod<T>(
   underlyingObject: UnderlyingSource,
   methodName: string | symbol,
   algoArgCount: number,
   ...extraArgs
-) {
+): (...args) => any {
   Assert(underlyingObject !== void 0);
   //assert(IsP)
   Assert(algoArgCount === 0 || algoArgCount === 1);

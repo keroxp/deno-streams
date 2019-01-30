@@ -136,7 +136,7 @@ export class ReadableByteStreamController extends ReadableStreamControllerBase
     ReadableByteStreamControllerClose(this);
   }
 
-  enqueue(chunk: ArrayBuffer): void {
+  enqueue(chunk: ArrayBufferView): void {
     if (!IsReadableByteStreamController(this)) {
       throw new TypeError();
     }

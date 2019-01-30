@@ -40,13 +40,13 @@ import {
   WritableStreamDefaultWriterGetDesiredSize,
   WritableStreamDefaultWriterRelease
 } from "./writable_stream_writer.ts";
-import {QueuingStrategy} from "./strategy.ts";
+import { QueuingStrategy } from "./strategy.ts";
 
-export type UnderlyingSource = {
+export type UnderlyingSource<T = any> = {
   type?: "bytes";
   autoAllocateChunkSize?: number;
-  start?: (controller: ReadableStreamController) => any;
-  pull?: (controller: ReadableStreamController) => any;
+  start?: (controller: ReadableStreamController<T>) => any;
+  pull?: (controller: ReadableStreamController<T>) => any;
   cancel?: CancelAlgorithm;
 };
 
@@ -55,10 +55,21 @@ export type PullAlgorithm = () => Promise<any>;
 export type CancelAlgorithm = (reason) => Promise<any>;
 export type SizeAlgorithm = (chunk) => number;
 
-export type ReadableStreamReadResult = { value; done: boolean };
+export type ReadableStreamReadResult<T> = { value: T; done: boolean };
 
-export class ReadableStream {
-  constructor(underlyingSource: UnderlyingSource, strategy: QueuingStrategy = {}) {
+export class ReadableStream<T = any> {
+  disturbed: boolean;
+  readableStreamController:
+    | ReadableByteStreamController
+    | ReadableStreamDefaultController<T>;
+  reader: ReadableStreamDefaultReader | ReadableStreamBYOBReader;
+  state: "readable" | "closed" | "errored";
+  storedError: Error;
+
+  constructor(
+    underlyingSource: UnderlyingSource<T>,
+    strategy: QueuingStrategy = {}
+  ) {
     InitializeReadableStream(this);
     let { highWaterMark, size } = strategy;
     const { type } = underlyingSource;
@@ -109,7 +120,9 @@ export class ReadableStream {
     return ReadableStreamCancel(this, reason);
   }
 
-  getReader(params: { mode?: "byob" } = {}): ReadableStreamReader {
+  getReader(
+    params: { mode?: "byob" } = {}
+  ): ReadableStreamBYOBReader | ReadableStreamReader<T> {
     if (!IsReadableStream(this)) {
       throw new TypeError();
     }
@@ -122,13 +135,13 @@ export class ReadableStream {
     throw new RangeError();
   }
 
-  pipeThrough(
+  pipeThrough<T>(
     {
       writable,
       readable
     }: {
-      writable: WritableStream;
-      readable: ReadableStream;
+      writable: WritableStream<T>;
+      readable: ReadableStream<T>;
     },
     {
       preventClose,
@@ -175,7 +188,7 @@ export class ReadableStream {
   }
 
   async pipeTo(
-    dest: WritableStream,
+    dest: WritableStream<T>,
     {
       preventClose,
       preventAbort,
@@ -222,14 +235,6 @@ export class ReadableStream {
     }
     return ReadableStreamTee(this, false);
   }
-
-  disturbed: boolean;
-  readableStreamController:
-    | ReadableByteStreamController
-    | ReadableStreamDefaultController;
-  reader: ReadableStreamDefaultReader | ReadableStreamBYOBReader;
-  state: "readable" | "closed" | "errored";
-  storedError: Error;
 }
 
 function AcquireReadableStreamBYOBReader(
@@ -244,7 +249,7 @@ function AcquireReadableStreamDefaultReader(
   return new ReadableStreamDefaultReader(stream);
 }
 
-function CreateReadableStreamInternal(
+function CreateReadableStreamInternal<T>(
   params: {
     startAlgorithm: StartAlgorithm;
     pullAlgorithm: PullAlgorithm;
@@ -373,12 +378,12 @@ export function ReadableStreamTee(
         if (done && !closedOrErrored) {
           if (!canceled1) {
             ReadableStreamDefaultControllerClose(
-              branch1.readableStreamController as ReadableStreamDefaultController
+              branch1.readableStreamController
             );
           }
           if (!canceled2) {
             ReadableStreamDefaultControllerClose(
-              branch2.readableStreamController as ReadableStreamDefaultController
+              branch2.readableStreamController
             );
           }
         }
@@ -391,13 +396,13 @@ export function ReadableStreamTee(
         }
         if (!canceled1) {
           ReadableStreamDefaultControllerEnqueue(
-            branch1.readableStreamController as ReadableStreamDefaultController,
+            branch1.readableStreamController,
             value1
           );
         }
         if (!canceled2) {
           ReadableStreamDefaultControllerEnqueue(
-            branch1.readableStreamController as ReadableStreamDefaultController,
+            branch1.readableStreamController,
             value2
           );
         }
@@ -437,14 +442,8 @@ export function ReadableStreamTee(
   });
   reader.closedPromise.catch(r => {
     if (!closedOrErrored) {
-      ReadableStreamDefaultControllerError(
-        branch1.readableStreamController as ReadableStreamDefaultController,
-        r
-      );
-      ReadableStreamDefaultControllerError(
-        branch2.readableStreamController as ReadableStreamDefaultController,
-        r
-      );
+      ReadableStreamDefaultControllerError(branch1.readableStreamController, r);
+      ReadableStreamDefaultControllerError(branch2.readableStreamController, r);
       closedOrErrored = true;
     }
   });
@@ -667,7 +666,7 @@ export function ReadableStreamCreateReadResult<T>(
   value,
   done: boolean,
   forAuthorCode: boolean
-): ReadableStreamReadResult {
+): ReadableStreamReadResult<T> {
   const ret = forAuthorCode ? Object.create({}) : Object.create(null);
   ret["value"] = value as T;
   ret["done"] = done;
@@ -710,13 +709,13 @@ export function ReadableStreamFulfillReadIntoRequest(
   );
 }
 
-export function ReadableStreamFulfillReadRequest(
+export function ReadableStreamFulfillReadRequest<T>(
   stream: ReadableStream,
   chunk,
   done
 ) {
   const reader = stream.reader;
-  const req = (<ReadableStreamDefaultReader>reader).readRequests.shift();
+  const req = (<ReadableStreamDefaultReader<T>>reader).readRequests.shift();
   req.promise.resolve(
     ReadableStreamCreateReadResult(chunk, done, req.forAuthorCode)
   );
@@ -726,8 +725,8 @@ export function ReadableStreamGetNumReadIntoRequests(stream: ReadableStream) {
   return (<ReadableStreamBYOBReader>stream.reader).readIntoRequests.length;
 }
 
-export function ReadableStreamGetNumReadRequests(stream) {
-  return (<ReadableStreamDefaultReader>stream.reader).readRequests.length;
+export function ReadableStreamGetNumReadRequests<T>(stream) {
+  return (<ReadableStreamDefaultReader<T>>stream.reader).readRequests.length;
 }
 
 export function ReadableStreamHasBYOBReader(stream: ReadableStream): boolean {

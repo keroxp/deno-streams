@@ -35,17 +35,18 @@ import {
   ReadableStreamBYOBRequestImpl
 } from "./readable_stream_request.ts";
 
-export interface ReadableStreamReader {
+export interface ReadableStreamReader<T = any> {
   readonly closed: Promise<any>;
 
   cancel(reason): Promise<any>;
 
-  read(view?: ArrayBufferView): Promise<ReadableStreamReadResult>;
+  read(view?: ArrayBufferView): Promise<ReadableStreamReadResult<T>>;
 
   releaseLock(): Promise<any>;
 }
 
-export class ReadableStreamDefaultReader implements ReadableStreamReader {
+export class ReadableStreamDefaultReader<T = any>
+  implements ReadableStreamReader<T> {
   readRequests: { promise: Defer<any>; forAuthorCode }[];
 
   constructor(stream: ReadableStream) {
@@ -79,7 +80,7 @@ export class ReadableStreamDefaultReader implements ReadableStreamReader {
     return ReadableStreamReaderGenericCancel(this, reason);
   }
 
-  read(): Promise<ReadableStreamReadResult> {
+  read(): Promise<ReadableStreamReadResult<T>> {
     if (!IsReadableStreamDefaultReader(this)) {
       return Promise.reject(new TypeError());
     }
@@ -103,7 +104,8 @@ export class ReadableStreamDefaultReader implements ReadableStreamReader {
   }
 }
 
-export class ReadableStreamBYOBReader implements ReadableStreamReader {
+export class ReadableStreamBYOBReader
+  implements ReadableStreamReader<ArrayBufferView> {
   readIntoRequests: { promise: Defer<any>; forAuthorCode: boolean }[];
 
   constructor(stream: ReadableStream) {
@@ -140,7 +142,9 @@ export class ReadableStreamBYOBReader implements ReadableStreamReader {
     return ReadableStreamReaderGenericCancel(this, reason);
   }
 
-  read(view): Promise<ReadableStreamReadResult> {
+  read(
+    view: ArrayBufferView
+  ): Promise<ReadableStreamReadResult<ArrayBufferView>> {
     if (!IsReadableStreamBYOBReader(this)) {
       return Promise.reject(new TypeError());
     }
@@ -179,9 +183,9 @@ export class ReadableStreamBYOBReader implements ReadableStreamReader {
   }
 }
 
-export function IsReadableStreamDefaultReader(
+export function IsReadableStreamDefaultReader<T>(
   a
-): a is ReadableStreamDefaultReader {
+): a is ReadableStreamDefaultReader<T> {
   return typeof a === "object" && a.hasOwnProperty("readRequests");
 }
 
@@ -189,8 +193,8 @@ export function IsReadableStreamBYOBReader(a): a is ReadableStreamBYOBReader {
   return typeof a === "object" && a.hasOwnProperty("readIntoRequests");
 }
 
-export function ReadableStreamReaderGenericCancel(
-  reader: ReadableStreamBYOBReader | ReadableStreamDefaultReader,
+export function ReadableStreamReaderGenericCancel<T>(
+  reader: ReadableStreamBYOBReader | ReadableStreamDefaultReader<T>,
   reason
 ) {
   const stream = reader.ownerReadableStream;
@@ -198,8 +202,8 @@ export function ReadableStreamReaderGenericCancel(
   return ReadableStreamCancel(stream, reason);
 }
 
-export function ReadableStreamReaderGenericInitialize(
-  reader: ReadableStreamBYOBReader | ReadableStreamDefaultReader,
+export function ReadableStreamReaderGenericInitialize<T>(
+  reader: ReadableStreamBYOBReader | ReadableStreamDefaultReader<T>,
   stream: ReadableStream
 ) {
   reader.ownerReadableStream = stream;
@@ -216,8 +220,8 @@ export function ReadableStreamReaderGenericInitialize(
   }
 }
 
-export function ReadableStreamReaderGenericRelease(
-  reader: ReadableStreamBYOBReader | ReadableStreamDefaultReader
+export function ReadableStreamReaderGenericRelease<T>(
+  reader: ReadableStreamBYOBReader | ReadableStreamDefaultReader<T>
 ) {
   Assert(reader.ownerReadableStream !== void 0);
   Assert(reader.ownerReadableStream.reader === reader);
@@ -252,8 +256,8 @@ export function ReadableStreamBYOBReaderRead(
   );
 }
 
-export function ReadableStreamDefaultReaderRead(
-  reader: ReadableStreamDefaultReader,
+export function ReadableStreamDefaultReaderRead<T>(
+  reader: ReadableStreamDefaultReader<T>,
   forAuthorCode: boolean = false
 ): Promise<{ value; done: boolean }> {
   const stream = reader.ownerReadableStream;
@@ -902,7 +906,7 @@ export function SetUpReadableByteStreamController(params: {
     });
 }
 
-export function SetUpReadableByteStreamControllerFromUnderlyingSource(
+export function SetUpReadableByteStreamControllerFromUnderlyingSource<T>(
   stream: ReadableStream,
   underlyingByteSource: UnderlyingSource,
   highWaterMark: number

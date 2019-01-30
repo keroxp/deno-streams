@@ -21,7 +21,7 @@ import {
   WritableStreamDefaultControllerWrite
 } from "./writable_stream_controller.ts";
 
-export interface WritableStreamWriter {
+export interface WritableStreamWriter<T> {
   readonly closed;
   readonly desiredSize;
   readonly ready;
@@ -32,10 +32,10 @@ export interface WritableStreamWriter {
 
   releaseLock();
 
-  write(chunk);
+  write(chunk: T);
 }
 
-export class WritableStreamDefaultWriter implements WritableStreamWriter {
+export class WritableStreamDefaultWriter<T> implements WritableStreamWriter<T> {
   constructor(stream: WritableStream) {
     if (!IsWritableStream(stream)) {
       throw new TypeError("stream is not writable stream");
@@ -147,22 +147,22 @@ export class WritableStreamDefaultWriter implements WritableStreamWriter {
   readyPromise: Defer<any>;
 }
 
-export function IsWritableStreamDefaultWriter(
+export function IsWritableStreamDefaultWriter<T>(
   x
-): x is WritableStreamDefaultWriter {
+): x is WritableStreamDefaultWriter<T> {
   return typeof x === "object" && x.hasOwnProperty("ownerWritableStream");
 }
 
-export function WritableStreamDefaultWriterAbort(
-  writer: WritableStreamDefaultWriter,
+export function WritableStreamDefaultWriterAbort<T>(
+  writer: WritableStreamDefaultWriter<T>,
   reason
 ) {
   Assert(writer.ownerWritableStream !== void 0);
   return WritableStreamAbort(writer.ownerWritableStream, reason);
 }
 
-export async function WritableStreamDefaultWriterClose(
-  writer: WritableStreamDefaultWriter
+export async function WritableStreamDefaultWriterClose<T>(
+  writer: WritableStreamDefaultWriter<T>
 ): Promise<any> {
   const stream = writer.ownerWritableStream;
   Assert(stream !== void 0);
@@ -181,8 +181,8 @@ export async function WritableStreamDefaultWriterClose(
   return promise;
 }
 
-export async function WritableStreamDefaultWriterCloseWithErrorPropagation(
-  writer: WritableStreamDefaultWriter
+export async function WritableStreamDefaultWriterCloseWithErrorPropagation<T>(
+  writer: WritableStreamDefaultWriter<T>
 ) {
   const stream = writer.ownerWritableStream;
   Assert(stream !== void 0);
@@ -197,8 +197,8 @@ export async function WritableStreamDefaultWriterCloseWithErrorPropagation(
   return WritableStreamDefaultWriterClose(writer);
 }
 
-export function WritableStreamDefaultWriterEnsureClosedPromiseRejected(
-  writer: WritableStreamDefaultWriter,
+export function WritableStreamDefaultWriterEnsureClosedPromiseRejected<T>(
+  writer: WritableStreamDefaultWriter<T>,
   error
 ) {
   if (writer.closedPromise[PromiseState] === "pending") {
@@ -208,8 +208,8 @@ export function WritableStreamDefaultWriterEnsureClosedPromiseRejected(
   }
 }
 
-export function WritableStreamDefaultWriterEnsureReadyPromiseRejected(
-  writer: WritableStreamDefaultWriter,
+export function WritableStreamDefaultWriterEnsureReadyPromiseRejected<T>(
+  writer: WritableStreamDefaultWriter<T>,
   error
 ) {
   if (writer.readyPromise[PromiseState] === "pending") {
@@ -219,8 +219,8 @@ export function WritableStreamDefaultWriterEnsureReadyPromiseRejected(
   }
 }
 
-export function WritableStreamDefaultWriterGetDesiredSize(
-  writer: WritableStreamDefaultWriter
+export function WritableStreamDefaultWriterGetDesiredSize<T>(
+  writer: WritableStreamDefaultWriter<T>
 ) {
   const stream = writer.ownerWritableStream;
   const { state } = stream;
@@ -235,8 +235,8 @@ export function WritableStreamDefaultWriterGetDesiredSize(
   );
 }
 
-export function WritableStreamDefaultWriterRelease(
-  writer: WritableStreamDefaultWriter
+export function WritableStreamDefaultWriterRelease<T>(
+  writer: WritableStreamDefaultWriter<T>
 ) {
   const stream = writer.ownerWritableStream;
   Assert(stream !== void 0, "stream is undefined");
@@ -248,8 +248,8 @@ export function WritableStreamDefaultWriterRelease(
   writer.ownerWritableStream = void 0;
 }
 
-export async function WritableStreamDefaultWriterWrite(
-  writer: WritableStreamDefaultWriter,
+export async function WritableStreamDefaultWriterWrite<T>(
+  writer: WritableStreamDefaultWriter<T>,
   chunk
 ) {
   const stream = writer.ownerWritableStream;

@@ -50,14 +50,14 @@ export type PullIntoDescriptor = {
   readerType: string;
 };
 
-export interface ReadableStreamController {
+export interface ReadableStreamController<T> {
   readonly byobRequest?: ReadableStreamBYOBRequest;
 
   readonly desiredSize: number;
 
   close(): void;
 
-  enqueue(chunk): void;
+  enqueue(chunk: T): void;
 
   error(e): void;
 }
@@ -87,7 +87,7 @@ abstract class ReadableStreamControllerBase {
 }
 
 export class ReadableByteStreamController extends ReadableStreamControllerBase
-  implements ReadableStreamController {
+  implements ReadableStreamController<ArrayBufferView> {
   constructor() {
     super();
     throw new TypeError();
@@ -175,7 +175,9 @@ export class ReadableByteStreamController extends ReadableStreamControllerBase
     return result;
   }
 
-  PullSteps(forAuthorCode?: boolean): Promise<ReadableStreamReadResult> {
+  PullSteps(
+    forAuthorCode?: boolean
+  ): Promise<ReadableStreamReadResult<ArrayBufferView>> {
     const stream = this.controlledReadableByteStream;
     Assert(ReadableStreamHasDefaultReader(stream));
     if (this.queueTotalSize > 0) {
@@ -217,9 +219,9 @@ export class ReadableByteStreamController extends ReadableStreamControllerBase
   }
 }
 
-export class ReadableStreamDefaultController
+export class ReadableStreamDefaultController<T>
   extends ReadableStreamControllerBase
-  implements ReadableStreamController {
+  implements ReadableStreamController<T> {
   constructor() {
     super();
     throw new TypeError();
@@ -245,7 +247,7 @@ export class ReadableStreamDefaultController
     ReadableStreamDefaultControllerClose(this);
   }
 
-  enqueue(chunk): void {
+  enqueue(chunk: T): void {
     if (!IsReadableStreamDefaultController(this)) {
       throw new TypeError();
     }
@@ -289,14 +291,14 @@ export class ReadableStreamDefaultController
   }
 }
 
-export function IsReadableStreamDefaultController(
+export function IsReadableStreamDefaultController<T>(
   x
-): x is ReadableStreamDefaultController {
+): x is ReadableStreamDefaultController<T> {
   return typeof x === "object" && x.hasOwnProperty("controlledReadableStream");
 }
 
-export function ReadableStreamDefaultControllerCallPullIfNeeded(
-  controller: ReadableStreamDefaultController
+export function ReadableStreamDefaultControllerCallPullIfNeeded<T>(
+  controller: ReadableStreamDefaultController<T>
 ) {
   const shouldPull = ReadableStreamDefaultControllerShouldCallPull(controller);
   if (!shouldPull) {
@@ -309,7 +311,7 @@ export function ReadableStreamDefaultControllerCallPullIfNeeded(
   Assert(!controller.pullAgain);
   controller.pulling = true;
   controller
-    .pullAlgorithm(controller)
+    .pullAlgorithm()
     .then(() => {
       controller.pulling = false;
       if (controller.pullAgain) {
@@ -322,8 +324,8 @@ export function ReadableStreamDefaultControllerCallPullIfNeeded(
     });
 }
 
-export function ReadableStreamDefaultControllerShouldCallPull(
-  controller: ReadableStreamDefaultController
+export function ReadableStreamDefaultControllerShouldCallPull<T>(
+  controller: ReadableStreamDefaultController<T>
 ) {
   const stream = controller.controlledReadableStream;
   if (!ReadableStreamDefaultControllerCanCloseOrEnqueue(controller)) {
@@ -343,17 +345,15 @@ export function ReadableStreamDefaultControllerShouldCallPull(
   return desiredSize > 0;
 }
 
-export function ReadableStreamDefaultControllerClearAlgorithms(
-  controller: ReadableStreamDefaultController
+export function ReadableStreamDefaultControllerClearAlgorithms<T>(
+  controller: ReadableStreamDefaultController<T>
 ) {
   controller.pullAlgorithm = void 0;
   controller.cancelAlgorithm = void 0;
   controller.strategySizeAlgorithm = void 0;
 }
 
-export function ReadableStreamDefaultControllerClose(
-  controller: ReadableStreamDefaultController
-) {
+export function ReadableStreamDefaultControllerClose<T>(controller) {
   const stream = controller.controlledReadableStream;
   Assert(ReadableStreamDefaultControllerCanCloseOrEnqueue(controller));
   controller.closeRequested = true;
@@ -363,51 +363,49 @@ export function ReadableStreamDefaultControllerClose(
   }
 }
 
-export function ReadableStreamDefaultControllerEnqueue(
-  controller: ReadableStreamDefaultController,
-  chunk
-) {
-  const stream = controller.controlledReadableStream;
-  Assert(ReadableStreamDefaultControllerCanCloseOrEnqueue(controller));
-  if (
-    IsReadableStreamLocked(stream) ||
-    ReadableStreamGetNumReadRequests(stream) > 0
-  ) {
-    ReadableStreamFulfillReadRequest(stream, chunk, false);
-  } else {
-    let result: number;
-    try {
-      result = controller.strategySizeAlgorithm(chunk);
-    } catch (e) {
-      ReadableStreamDefaultControllerError(controller, e);
-      return e;
+export function ReadableStreamDefaultControllerEnqueue<T>(controller, chunk) {
+  if (IsReadableStreamDefaultController(controller)) {
+    const stream = controller.controlledReadableStream;
+    Assert(ReadableStreamDefaultControllerCanCloseOrEnqueue(controller));
+    if (
+      IsReadableStreamLocked(stream) ||
+      ReadableStreamGetNumReadRequests(stream) > 0
+    ) {
+      ReadableStreamFulfillReadRequest(stream, chunk, false);
+    } else {
+      let result: number;
+      try {
+        result = controller.strategySizeAlgorithm(chunk);
+      } catch (e) {
+        ReadableStreamDefaultControllerError(controller, e);
+        return e;
+      }
+      const chunkSize = result;
+      try {
+        EnqueueValueWithSize(controller, chunk, chunkSize);
+      } catch (e) {
+        ReadableStreamDefaultControllerError(controller, e);
+        return e;
+      }
+      ReadableStreamDefaultControllerCallPullIfNeeded(controller);
     }
-    const chunkSize = result;
-    try {
-      EnqueueValueWithSize(controller, chunk, chunkSize);
-    } catch (e) {
-      ReadableStreamDefaultControllerError(controller, e);
-      return e;
-    }
-    ReadableStreamDefaultControllerCallPullIfNeeded(controller);
   }
 }
 
-export function ReadableStreamDefaultControllerError(
-  controller: ReadableStreamDefaultController,
-  e
-) {
-  const stream = controller.controlledReadableStream;
-  if (stream.state !== "readable") {
-    return;
+export function ReadableStreamDefaultControllerError<T>(controller, e) {
+  if (IsReadableStreamDefaultController(controller)) {
+    const stream = controller.controlledReadableStream;
+    if (stream.state !== "readable") {
+      return;
+    }
+    ResetQueue(controller);
+    ReadableStreamDefaultControllerClearAlgorithms(controller);
+    ReadableStreamError(stream, e);
   }
-  ResetQueue(controller);
-  ReadableStreamDefaultControllerClearAlgorithms(controller);
-  ReadableStreamError(stream, e);
 }
 
-export function ReadableStreamDefaultControllerGetDesiredSize(
-  controller: ReadableStreamDefaultController
+export function ReadableStreamDefaultControllerGetDesiredSize<T>(
+  controller: ReadableStreamDefaultController<T>
 ): number | null {
   const stream = controller.controlledReadableStream;
   const state = stream.state;
@@ -420,22 +418,22 @@ export function ReadableStreamDefaultControllerGetDesiredSize(
   return controller.strategyHWM - controller.queueTotalSize;
 }
 
-export function ReadableStreamDefaultControllerHasBackpressure(
-  controller: ReadableStreamDefaultController
+export function ReadableStreamDefaultControllerHasBackpressure<T>(
+  controller: ReadableStreamDefaultController<T>
 ): boolean {
   return !ReadableStreamDefaultControllerShouldCallPull(controller);
 }
 
-export function ReadableStreamDefaultControllerCanCloseOrEnqueue(
-  controller: ReadableStreamDefaultController
+export function ReadableStreamDefaultControllerCanCloseOrEnqueue<T>(
+  controller: ReadableStreamDefaultController<T>
 ): boolean {
   const state = controller.controlledReadableStream.state;
   return !controller.closeRequested && state === "readable";
 }
 
-export function SetUpReadableStreamDefaultController(params: {
+export function SetUpReadableStreamDefaultController<T>(params: {
   stream: ReadableStream;
-  controller: ReadableStreamDefaultController;
+  controller: ReadableStreamDefaultController<T>;
   startAlgorithm: StartAlgorithm;
   pullAlgorithm: PullAlgorithm;
   cancelAlgorithm: CancelAlgorithm;
@@ -464,7 +462,7 @@ export function SetUpReadableStreamDefaultController(params: {
   controller.pullAlgorithm = pullAlgorithm;
   controller.cancelAlgorithm = cancelAlgorithm;
   stream.readableStreamController = controller;
-  Promise.resolve(startAlgorithm(controller))
+  Promise.resolve(startAlgorithm())
     .then(() => {
       controller.started = true;
       Assert(controller.pulling == false);

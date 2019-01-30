@@ -33,7 +33,9 @@ export interface WritableStreamController {
 export const ErrorSteps = Symbol("ErrorSteps");
 export const AbortSteps = Symbol("AbortSteps");
 
-export function createWritableStreamDefaultController(): WritableStreamDefaultController {
+export function createWritableStreamDefaultController<
+  T
+>(): WritableStreamDefaultController<T> {
   const ret = Object.create(WritableStreamDefaultController.prototype);
   ret[ErrorSteps] = () => ResetQueue(ret);
   ret[AbortSteps] = reason => {
@@ -44,12 +46,12 @@ export function createWritableStreamDefaultController(): WritableStreamDefaultCo
   return ret;
 }
 
-export class WritableStreamDefaultController
+export class WritableStreamDefaultController<T>
   implements WritableStreamController {
   abortAlgorithm: AbortAlgorithm;
   closeAlgorithm: CloseAlgorithm;
   controlledWritableStream: WritableStream;
-  queue: ("close" | { chunk })[];
+  queue: ("close" | { chunk: T })[];
   queueTotalSize: number;
   started: boolean;
   strategyHWM: number;
@@ -72,15 +74,15 @@ export class WritableStreamDefaultController
   }
 }
 
-export function IsWritableStreamDefaultController(
+export function IsWritableStreamDefaultController<T>(
   x
-): x is WritableStreamDefaultController {
+): x is WritableStreamDefaultController<T> {
   return typeof x === "object" && x.hasOwnProperty("controlledWritableStream");
 }
 
-export function SetUpWritableStreamDefaultController(params: {
+export function SetUpWritableStreamDefaultController<T>(params: {
   stream: WritableStream;
-  controller: WritableStreamDefaultController;
+  controller: WritableStreamDefaultController<T>;
   startAlgorithm: StartAlgorithm;
   writeAlgorithm: WriteAlgorithm;
   closeAlgorithm: CloseAlgorithm;
@@ -164,8 +166,8 @@ export function SetUpWritableStreamDefaultControllerFromUnderlyingSink(
   });
 }
 
-export function WritableStreamDefaultControllerClearAlgorithms(
-  controller: WritableStreamDefaultController
+export function WritableStreamDefaultControllerClearAlgorithms<T>(
+  controller: WritableStreamDefaultController<T>
 ) {
   controller.writeAlgorithm = void 0;
   controller.closeAlgorithm = void 0;
@@ -173,15 +175,15 @@ export function WritableStreamDefaultControllerClearAlgorithms(
   controller.strategySizeAlgorithm = void 0;
 }
 
-export function WritableStreamDefaultControllerClose(
-  controller: WritableStreamDefaultController
+export function WritableStreamDefaultControllerClose<T>(
+  controller: WritableStreamDefaultController<T>
 ) {
   EnqueueValueWithSize(controller, "close", 0);
   WritableStreamDefaultControllerAdvanceQueueIfNeeded(controller);
 }
 
-export function WritableStreamDefaultControllerGetChunkSize(
-  controller: WritableStreamDefaultController,
+export function WritableStreamDefaultControllerGetChunkSize<T>(
+  controller: WritableStreamDefaultController<T>,
   chunk
 ): number {
   try {
@@ -192,14 +194,14 @@ export function WritableStreamDefaultControllerGetChunkSize(
   }
 }
 
-export function WritableStreamDefaultControllerGetDesiredSize(
-  controller: WritableStreamDefaultController
+export function WritableStreamDefaultControllerGetDesiredSize<T>(
+  controller: WritableStreamDefaultController<T>
 ): number {
   return controller.strategyHWM - controller.queueTotalSize;
 }
 
-export function WritableStreamDefaultControllerWrite(
-  controller: WritableStreamDefaultController,
+export function WritableStreamDefaultControllerWrite<T>(
+  controller: WritableStreamDefaultController<T>,
   chunk,
   chunkSize: number
 ) {
@@ -223,8 +225,8 @@ export function WritableStreamDefaultControllerWrite(
   WritableStreamDefaultControllerAdvanceQueueIfNeeded(controller);
 }
 
-export function WritableStreamDefaultControllerAdvanceQueueIfNeeded(
-  controller: WritableStreamDefaultController
+export function WritableStreamDefaultControllerAdvanceQueueIfNeeded<T>(
+  controller: WritableStreamDefaultController<T>
 ) {
   const stream = controller.controlledWritableStream;
   if (!controller.started) {
@@ -252,8 +254,8 @@ export function WritableStreamDefaultControllerAdvanceQueueIfNeeded(
   }
 }
 
-export function WritableStreamDefaultControllerErrorIfNeeded(
-  controller: WritableStreamDefaultController,
+export function WritableStreamDefaultControllerErrorIfNeeded<T>(
+  controller: WritableStreamDefaultController<T>,
   error
 ) {
   if (controller.controlledWritableStream.state === "writable") {
@@ -261,8 +263,8 @@ export function WritableStreamDefaultControllerErrorIfNeeded(
   }
 }
 
-export function WritableStreamDefaultControllerProcessClose(
-  controller: WritableStreamDefaultController
+export function WritableStreamDefaultControllerProcessClose<T>(
+  controller: WritableStreamDefaultController<T>
 ) {
   const stream = controller.controlledWritableStream;
   WritableStreamMarkCloseRequestInFlight(stream);
@@ -279,8 +281,8 @@ export function WritableStreamDefaultControllerProcessClose(
     });
 }
 
-export function WritableStreamDefaultControllerProcessWrite(
-  controller: WritableStreamDefaultController,
+export function WritableStreamDefaultControllerProcessWrite<T>(
+  controller: WritableStreamDefaultController<T>,
   chunk
 ) {
   const stream = controller.controlledWritableStream;
@@ -299,14 +301,14 @@ export function WritableStreamDefaultControllerProcessWrite(
   });
 }
 
-export function WritableStreamDefaultControllerGetBackpressure(
-  controller: WritableStreamDefaultController
+export function WritableStreamDefaultControllerGetBackpressure<T>(
+  controller: WritableStreamDefaultController<T>
 ) {
   return WritableStreamDefaultControllerGetDesiredSize(controller) <= 0;
 }
 
-export function WritableStreamDefaultControllerError(
-  controller: WritableStreamDefaultController,
+export function WritableStreamDefaultControllerError<T>(
+  controller: WritableStreamDefaultController<T>,
   error
 ) {
   const stream = controller.controlledWritableStream;

@@ -1,23 +1,12 @@
-import {
-  assertEqual,
-  setFilter,
-  test
-} from "https://deno.land/x/testing@v0.2.6/mod.ts";
+import { assertEqual, test } from "https://deno.land/x/testing@v0.2.6/mod.ts";
 import { ReadableStream } from "./readable_stream.ts";
-import {
-  ReadableStreamController,
-  ReadableStreamDefaultController
-} from "./readable_stream_controller.ts";
-import {
-  ReadableStreamBYOBReader,
-  ReadableStreamDefaultReader
-} from "./readable_stream_reader.ts";
+import { ReadableStreamBYOBReader } from "./readable_stream_reader.ts";
 
 test(async function testReadableStream() {
   const src = [0, 1, 2, 3, 4, 5, 6];
   let i = 0;
-  const stream = new ReadableStream({
-    async pull(controller: ReadableStreamController) {
+  const stream = new ReadableStream<number>({
+    pull: controller => {
       controller.enqueue(src[i++]);
       if (i >= src.length) {
         controller.close();
@@ -25,7 +14,7 @@ test(async function testReadableStream() {
       }
     }
   });
-  const reader = stream.getReader() as ReadableStreamDefaultReader;
+  const reader = stream.getReader();
   for (let i = 0; i < src.length + 1; i++) {
     const { value, done } = await reader.read();
     if (i < 7) {
@@ -41,11 +30,7 @@ test(async function testReadableStream2() {
   let i = 0;
   const stream = new ReadableStream(
     {
-      async start(controller: ReadableStreamDefaultController) {
-        console.log(controller.enqueue);
-      },
-
-      async pull(controller: ReadableStreamDefaultController) {
+      pull: controller => {
         console.log(controller.enqueue);
         controller.enqueue(src.slice(i, i + 2));
         i += 2;
@@ -61,7 +46,7 @@ test(async function testReadableStream2() {
       }
     }
   );
-  const reader = stream.getReader() as ReadableStreamDefaultReader;
+  const reader = stream.getReader();
   for (let i = 0; i < src.length + 1; i += 2) {
     const { value, done } = await reader.read();
     if (i < src.length) {
@@ -76,10 +61,10 @@ test(async function testReadableStream3() {
   const src = new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7]);
   const stream = new ReadableStream({
     type: "bytes",
-    async start(controller: ReadableStreamController) {
+    start: controller => {
       controller.enqueue(src);
     },
-    async pull(controller: ReadableStreamController) {
+    pull: controller => {
       controller.close();
     }
   });
@@ -101,10 +86,10 @@ test(async function testReadableStream4() {
   const src = new Uint16Array([0x1234, 0x5678]);
   const stream = new ReadableStream({
     type: "bytes",
-    async start(controller: ReadableStreamController) {
+    start: controller => {
       controller.enqueue(src);
     },
-    async pull(controller: ReadableStreamController) {
+    pull: controller => {
       controller.close();
     }
   });

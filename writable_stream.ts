@@ -19,13 +19,13 @@ import {
   SetUpWritableStreamDefaultControllerFromUnderlyingSink,
   WritableStreamDefaultController
 } from "./writable_stream_controller.ts";
-import {QueuingStrategy} from "./strategy.ts";
+import { QueuingStrategy } from "./strategy.ts";
 
 export type WriteAlgorithm = (chunk) => any;
 export type CloseAlgorithm = () => any;
 export type AbortAlgorithm = (reason) => any;
 
-export class WritableStream {
+export class WritableStream<T = any> {
   constructor(
     underlyingSink: {
       start?: StartAlgorithm;
@@ -72,7 +72,7 @@ export class WritableStream {
     return WritableStreamAbort(this, reason);
   }
 
-  getWriter(): WritableStreamWriter {
+  getWriter(): WritableStreamWriter<T> {
     if (!IsWritableStream(this)) {
       throw new TypeError("this is not writable stream");
     }
@@ -90,14 +90,14 @@ export class WritableStream {
   };
   state: "writable" | "closed" | "erroring" | "errored";
   storedError: Error;
-  writableStreamController: WritableStreamDefaultController;
-  writer: WritableStreamDefaultWriter;
+  writableStreamController: WritableStreamDefaultController<T>;
+  writer: WritableStreamDefaultWriter<T>;
   writeRequests: Defer<any>[];
 }
 
-export function AcquireWritableStreamDefaultWriter(
+export function AcquireWritableStreamDefaultWriter<T>(
   stream: WritableStream
-): WritableStreamDefaultWriter {
+): WritableStreamDefaultWriter<T> {
   return new WritableStreamDefaultWriter(stream);
 }
 

@@ -23,15 +23,15 @@ test(async function testWritableStream() {
   });
   await readable.pipeTo(writable);
   assertEqual(chunks, src);
-  assertEqual(readable.state, "closed")
-  assertEqual(writable.state, "closed")
+  assertEqual(readable.state, "closed");
+  assertEqual(writable.state, "closed");
 });
 
 test(async function testWritableStreamError() {
   const chunks = [];
   const readable = new ReadableStream({
     pull: controller => {
-      controller.error("error")
+      controller.error("error");
     }
   });
   const writable = new WritableStream({
@@ -40,6 +40,6 @@ test(async function testWritableStreamError() {
     }
   });
   await readable.pipeTo(writable);
-  assertEqual(readable.state, "errored")
-  assertEqual(writable.state, "errored")
+  assertEqual(readable.state, "errored");
+  assertEqual(writable.state, "errored");
 });

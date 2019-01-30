@@ -1,28 +1,28 @@
 export interface QueuingStrategy {
-  readonly highWaterMark?: number
-  readonly size?: (chunk) => number
+  readonly highWaterMark?: number;
+  readonly size?: (chunk) => number;
 }
 
 export class ByteLengthQueuingStrategy implements QueuingStrategy {
-  constructor({highWaterMark}) {
-    this.highWaterMark = highWaterMark
+  constructor({ highWaterMark }) {
+    this.highWaterMark = highWaterMark;
   }
 
   highWaterMark: number;
 
   size(chunk: { byteLength: number }): number {
-    return chunk.byteLength
-  };
+    return chunk.byteLength;
+  }
 }
 
 export class CountQueuingStrategy implements QueuingStrategy {
-  constructor({highWaterMark}) {
-    this.highWaterMark = highWaterMark
+  constructor({ highWaterMark }) {
+    this.highWaterMark = highWaterMark;
   }
 
-  highWaterMark: number
+  highWaterMark: number;
 
   size(_): number {
-    return 1
+    return 1;
   }
 }

@@ -40,6 +40,7 @@ import {
   WritableStreamDefaultWriterGetDesiredSize,
   WritableStreamDefaultWriterRelease
 } from "./writable_stream_writer.ts";
+import {QueuingStrategy} from "./strategy.ts";
 
 export type UnderlyingSource = {
   type?: "bytes";
@@ -47,11 +48,6 @@ export type UnderlyingSource = {
   start?: (controller: ReadableStreamController) => any;
   pull?: (controller: ReadableStreamController) => any;
   cancel?: CancelAlgorithm;
-};
-
-export type Strategy = {
-  size?: SizeAlgorithm;
-  highWaterMark?: number;
 };
 
 export type StartAlgorithm = () => any;
@@ -62,7 +58,7 @@ export type SizeAlgorithm = (chunk) => number;
 export type ReadableStreamReadResult = { value; done: boolean };
 
 export class ReadableStream {
-  constructor(underlyingSource: UnderlyingSource, strategy: Strategy = {}) {
+  constructor(underlyingSource: UnderlyingSource, strategy: QueuingStrategy = {}) {
     InitializeReadableStream(this);
     let { highWaterMark, size } = strategy;
     const { type } = underlyingSource;

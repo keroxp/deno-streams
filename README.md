@@ -18,5 +18,5 @@ See: https://streams.spec.whatwg.org/
   - 🔰`abort( reason )`
   - 🔰`getWriter()`
 - ❌TransformStream
-- ❌ByteLengthQueuingStrategy
-- ❌CountQueuingStrategy
+- 🔰ByteLengthQueuingStrategy
+- 🔰CountQueuingStrategy

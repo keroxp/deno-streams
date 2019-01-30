@@ -19,6 +19,7 @@ import {
   SetUpWritableStreamDefaultControllerFromUnderlyingSink,
   WritableStreamDefaultController
 } from "./writable_stream_controller.ts";
+import {QueuingStrategy} from "./strategy.ts";
 
 export type WriteAlgorithm = (chunk) => any;
 export type CloseAlgorithm = () => any;
@@ -33,10 +34,7 @@ export class WritableStream {
       abort?: AbortAlgorithm;
       type?: string;
     },
-    strategy: {
-      highWaterMark?: number;
-      size?: SizeAlgorithm;
-    } = {}
+    strategy: QueuingStrategy = {}
   ) {
     InitializeWritableStream(this);
     let { size, highWaterMark } = strategy;

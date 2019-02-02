@@ -14,7 +14,7 @@ import { ReadableStreamBYOBReader } from "./readable_stream_byob_reader.ts";
 export interface ReadableStreamReader<T = any> {
   readonly closed: Promise<any>;
 
-  cancel(reason): Promise<any>;
+  cancel(reason?): Promise<void>;
 
   read(view?: ArrayBufferView): Promise<ReadableStreamReadResult<T>>;
 
@@ -46,7 +46,7 @@ export class ReadableStreamDefaultReader<T = any>
   closedPromise: Defer<undefined>;
   ownerReadableStream: ReadableStream;
 
-  cancel(reason): Promise<undefined> {
+  cancel(reason?): Promise<void> {
     if (!IsReadableStreamDefaultReader(this)) {
       return Promise.reject(new TypeError());
     }

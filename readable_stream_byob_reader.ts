@@ -1,11 +1,11 @@
-import { Defer } from "./defer.ts";
+import {Defer} from "./defer.ts";
 import {
   IsReadableStream,
   IsReadableStreamLocked,
   ReadableStream,
   ReadableStreamReadResult
 } from "./readable_stream.ts";
-import { Assert, isArrayBufferView } from "./util.ts";
+import {Assert, isArrayBufferView} from "./util.ts";
 import {
   ReadableStreamReader,
   ReadableStreamReaderGenericCancel,
@@ -56,9 +56,9 @@ export class ReadableStreamBYOBReader
     return ReadableStreamReaderGenericCancel(this, reason);
   }
 
-  read(
-    view: ArrayBufferView
-  ): Promise<ReadableStreamReadResult<ArrayBufferView>> {
+  read<T extends ArrayBufferView>(
+    view: T
+  ): Promise<ReadableStreamReadResult<T>> {
     if (!IsReadableStreamBYOBReader(this)) {
       return Promise.reject(new TypeError());
     }

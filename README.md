@@ -6,18 +6,21 @@ See: https://streams.spec.whatwg.org/
 # compatibility table
 
 - 🔰ReadableStream
-  - 🔰new ReadableSteram(underlyingSource = {}, strategy = {})
-  - 🔰get locked
-  - 🔰cancel(reason)
-  - 🔰pipeThrough({ writable, readable }, { preventClose, preventAbort, preventCancel, signal } = {})
-  - 🔰pipeTo(dest, { preventClose, preventAbort, preventCancel, signal } = {})
-  - 🔰tee()
+  - 🔰 `new ReadableStream(underlyingSource = {}, strategy = {})`
+  - 🔰 `get locked`
+  - 🔰 `cancel(reason)`n
+  - 🔰 `pipeThrough({ writable, readable }, { preventClose, preventAbort, preventCancel, signal } = {})`
+  - 🔰 `pipeTo(dest, { preventClose, preventAbort, preventCancel, signal } = {})`
+  - 🔰 `tee()`
 - 🔰WritableStream
   - 🔰`new WritableStream( underlyingSink = {}, strategy = {} )`
   - 🔰`get locked`
   - 🔰`abort( reason )`
   - 🔰`getWriter()`
-- ❌TransformStream
+- 🔰TransformStream
+  - 🔰 `new TransformStream( transformer = {}, writableStrategy = {}, readableStrategy = {} )`
+  - 🔰 `get readable`
+  - 🔰 `get writable`
 - 🔰ByteLengthQueuingStrategy
 - 🔰CountQueuingStrategy
 # Usage

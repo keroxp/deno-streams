@@ -1,18 +1,12 @@
 import {
-  IsReadableByteStreamController,
-  IsReadableStreamBYOBReader,
   IsReadableStreamDefaultReader,
-  ReadableStreamBYOBReader,
   ReadableStreamDefaultReader,
   ReadableStreamDefaultReaderRead,
   ReadableStreamReader,
-  ReadableStreamReaderGenericRelease,
-  SetUpReadableByteStreamController,
-  SetUpReadableByteStreamControllerFromUnderlyingSource
+  ReadableStreamReaderGenericRelease
 } from "./readable_stream_reader.ts";
 import { Assert, isAbortSignal } from "./util.ts";
 import {
-  ReadableByteStreamController,
   ReadableStreamController,
   ReadableStreamDefaultController,
   ReadableStreamDefaultControllerClose,
@@ -41,6 +35,16 @@ import {
   WritableStreamDefaultWriterRelease
 } from "./writable_stream_writer.ts";
 import { QueuingStrategy } from "./strategy.ts";
+import {
+  IsReadableByteStreamController,
+  SetUpReadableByteStreamController,
+  SetUpReadableByteStreamControllerFromUnderlyingSource,
+  ReadableByteStreamController
+} from "./readable_byte_stream_controller.ts";
+import {
+  IsReadableStreamBYOBReader,
+  ReadableStreamBYOBReader
+} from "./readable_stream_byob_reader.ts";
 
 export type UnderlyingSource<T = any> = {
   type?: "bytes";
@@ -176,14 +180,14 @@ export class ReadableStream<T = any> {
     if (IsWritableStreamLocked(writable)) {
       throw new TypeError("writable is locked");
     }
-    ReadableStreamPipeTo({
-      source: this,
-      dest: writable,
+    ReadableStreamPipeTo(
+      this,
+      writable,
       preventClose,
       preventAbort,
       preventCancel,
       signal
-    });
+    );
     return readable;
   }
 
@@ -219,14 +223,14 @@ export class ReadableStream<T = any> {
     if (IsWritableStreamLocked(dest)) {
       throw new TypeError("writable is locked");
     }
-    return ReadableStreamPipeTo({
-      source: this,
+    return ReadableStreamPipeTo(
+      this,
       dest,
       preventClose,
       preventCancel,
       preventAbort,
       signal
-    });
+    );
   }
 
   tee(): [ReadableStream, ReadableStream] {
@@ -416,21 +420,14 @@ export function ReadableStreamTee(
   return [branch1, branch2];
 }
 
-export async function ReadableStreamPipeTo({
-  source,
-  dest,
-  preventClose,
-  preventAbort,
-  preventCancel,
-  signal
-}: {
-  source: ReadableStream;
-  dest: WritableStream;
-  preventClose: boolean;
-  preventAbort: boolean;
-  preventCancel: boolean;
-  signal?;
-}) {
+export async function ReadableStreamPipeTo(
+  source: ReadableStream,
+  dest: WritableStream,
+  preventClose: boolean,
+  preventAbort: boolean,
+  preventCancel: boolean,
+  signal?
+) {
   Assert(IsReadableStream(source));
   Assert(IsWritableStream(dest));
   Assert(typeof preventCancel === "boolean");

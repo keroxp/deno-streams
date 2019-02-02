@@ -1,14 +1,17 @@
-import { ReadableByteStreamController } from "./readable_stream_controller.ts";
+import { IsDetachedBuffer } from "./misc.ts";
+import { Assert } from "./util.ts";
 import {
-  IsReadableStreamBYOBRequest,
+  ReadableByteStreamController,
+  IsReadableByteStreamController,
   ReadableByteStreamControllerRespond,
   ReadableByteStreamControllerRespondWithNewView
-} from "./readable_stream_reader.ts";
-import { IsDetachedBuffer } from "./misc.ts";
+} from "./readable_byte_stream_controller.ts";
 
 export interface ReadableStreamBYOBRequest {
   readonly view: Uint8Array;
+
   respond(bytesWritten: number): void;
+
   respondWithNewView(view: Uint8Array): void;
 }
 
@@ -64,4 +67,24 @@ export class ReadableStreamBYOBRequestImpl
       view
     );
   }
+}
+
+export function IsReadableStreamBYOBRequest(x): x is ReadableStreamBYOBRequest {
+  return (
+    typeof x === "object" &&
+    x.hasOwnProperty("associatedReadableByteStreamController")
+  );
+}
+
+export function SetUpReadableStreamBYOBRequest(
+  request: ReadableStreamBYOBRequestImpl,
+  controller: ReadableByteStreamController,
+  view
+) {
+  Assert(IsReadableByteStreamController(controller));
+  Assert(typeof view === "object");
+  Assert(view.hasOwnProperty("ViewedArrayBuffer"));
+  Assert(view.ViewedArrayBuffer !== null);
+  request.associatedReadableByteStreamController = controller;
+  request._view = view;
 }

@@ -1,6 +1,6 @@
 import { assertEqual, test } from "https://deno.land/x/testing@v0.2.6/mod.ts";
 import { ReadableStream } from "./readable_stream.ts";
-import { ReadableStreamBYOBReader } from "./readable_stream_reader.ts";
+import { ReadableStreamBYOBReader } from "./readable_stream_byob_reader.ts";
 
 test(async function testReadableStream() {
   const src = [0, 1, 2, 3, 4, 5, 6];

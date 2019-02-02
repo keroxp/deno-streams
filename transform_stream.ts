@@ -6,7 +6,6 @@ import {
 } from "./readable_stream.ts";
 import { defer, Defer } from "./defer.ts";
 import { CreateWritableStream, WritableStream } from "./writable_stream.ts";
-import { QueuingStrategy } from "./strategy.ts";
 import {
   InvokeOrNoop,
   IsNonNegativeNumber,
@@ -23,10 +22,11 @@ import {
   TransformStreamDefaultSinkCloseAlgorithm,
   TransformStreamDefaultSinkWriteAlgorithm,
   TransformStreamDefaultSourcePullAlgorithm
-} from "./transform_stream_controller";
-import { Assert } from "./util";
-import { ReadableStreamDefaultControllerError } from "./readable_stream_controller";
-import { WritableStreamDefaultControllerErrorIfNeeded } from "./writable_stream_controller";
+} from "./transform_stream_controller.ts";
+import { Assert } from "./util.ts";
+import { ReadableStreamDefaultControllerError } from "./readable_stream_controller.ts";
+import { WritableStreamDefaultControllerErrorIfNeeded } from "./writable_stream_controller.ts";
+import { QueuingStrategy } from "./strategy.ts";
 
 export type Transformer<T> = {
   start?: (controller) => any;

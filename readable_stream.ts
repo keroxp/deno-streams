@@ -114,7 +114,7 @@ export class ReadableStream<T = any> {
     return IsReadableStreamLocked(this);
   }
 
-  cancel(reason): Promise<undefined> {
+  cancel(reason?): Promise<void> {
     if (IsReadableStream(this)) {
       return Promise.reject(new TypeError());
     }

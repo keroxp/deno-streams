@@ -11,13 +11,7 @@
       "dom.iterable"
     ],
     "paths": {
-      "deno": ["./deno.d.ts"],
-      "https://*": [
-        "../../.deno/deps/https/*"
-      ],
-      "http://*": [
-        "../../.deno/deps/http/*"
-      ]
+      "deno": ["./deno.d.ts"]
     }
   }
 }

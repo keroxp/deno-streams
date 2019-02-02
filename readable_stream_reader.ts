@@ -1,6 +1,8 @@
 import {
+  CancelAlgorithm,
   IsReadableStream,
   IsReadableStreamLocked,
+  PullAlgorithm,
   ReadableStream,
   ReadableStreamAddReadIntoRequest,
   ReadableStreamCancel,
@@ -14,6 +16,7 @@ import {
   ReadableStreamHasBYOBReader,
   ReadableStreamHasDefaultReader,
   ReadableStreamReadResult,
+  StartAlgorithm,
   UnderlyingSource
 } from "./readable_stream.ts";
 import {
@@ -858,24 +861,15 @@ export function ReadableByteStreamControllerShouldCallPull(
   return false;
 }
 
-export function SetUpReadableByteStreamController(params: {
-  stream: ReadableStream;
-  controller: ReadableByteStreamController;
-  startAlgorithm;
-  pullAlgorithm;
-  cancelAlgorithm;
-  highWaterMark;
-  autoAllocateChunkSize;
-}) {
-  const {
-    stream,
-    controller,
-    startAlgorithm,
-    pullAlgorithm,
-    cancelAlgorithm,
-    highWaterMark,
-    autoAllocateChunkSize
-  } = params;
+export function SetUpReadableByteStreamController(
+  stream: ReadableStream,
+  controller: ReadableByteStreamController,
+  startAlgorithm: StartAlgorithm,
+  pullAlgorithm: PullAlgorithm,
+  cancelAlgorithm: CancelAlgorithm,
+  highWaterMark: number,
+  autoAllocateChunkSize: number
+) {
   Assert(stream.readableStreamController === void 0);
   if (autoAllocateChunkSize !== void 0) {
     Assert(Number.isInteger(autoAllocateChunkSize));
@@ -932,7 +926,7 @@ export function SetUpReadableByteStreamControllerFromUnderlyingSource<T>(
       throw new RangeError();
     }
   }
-  SetUpReadableByteStreamController({
+  SetUpReadableByteStreamController(
     stream,
     controller,
     startAlgorithm,
@@ -940,7 +934,7 @@ export function SetUpReadableByteStreamControllerFromUnderlyingSource<T>(
     cancelAlgorithm,
     highWaterMark,
     autoAllocateChunkSize
-  });
+  );
 }
 
 export function SetUpReadableStreamBYOBRequest(

@@ -249,88 +249,54 @@ function AcquireReadableStreamDefaultReader(
   return new ReadableStreamDefaultReader(stream);
 }
 
-function CreateReadableStreamInternal<T>(
-  params: {
-    startAlgorithm: StartAlgorithm;
-    pullAlgorithm: PullAlgorithm;
-    cancelAlgorithm: CancelAlgorithm;
-    highWaterMark?: number;
-    sizeAlgorithm?: SizeAlgorithm;
-    autoAllocateChunkSize?: number;
-  },
-  bytes: boolean
+export function CreateReadableStream(
+  startAlgorithm: StartAlgorithm,
+  pullAlgorithm: PullAlgorithm,
+  cancelAlgorithm: CancelAlgorithm,
+  highWaterMark: number = 1,
+  sizeAlgorithm: SizeAlgorithm = () => 1
 ): ReadableStream {
-  const {
+  Assert(IsNonNegativeNumber(highWaterMark));
+  const stream = Object.create(ReadableStream.prototype);
+  InitializeReadableStream(stream);
+  const controller = Object.create(ReadableStreamDefaultController.prototype);
+  SetUpReadableStreamDefaultController({
+    stream,
+    controller,
     startAlgorithm,
     pullAlgorithm,
     cancelAlgorithm,
-    autoAllocateChunkSize
-  } = params;
-  let { highWaterMark, sizeAlgorithm } = params;
-  if (highWaterMark === void 0) {
-    highWaterMark = 1;
-  }
-  if (sizeAlgorithm === void 0) {
-    sizeAlgorithm = () => 1;
-  }
-  Assert(IsNonNegativeNumber(sizeAlgorithm));
-  const stream = new ReadableStream(
-    {
-      start: startAlgorithm,
-      pull: pullAlgorithm,
-      cancel: cancelAlgorithm
-    },
-    {
-      size: sizeAlgorithm,
-      highWaterMark
-    }
-  );
-  InitializeReadableStream(stream);
-  let controller;
-  if (bytes) {
-    controller = Object.create(ReadableByteStreamController.prototype);
-    SetUpReadableByteStreamController({
-      stream,
-      controller,
-      startAlgorithm,
-      pullAlgorithm,
-      cancelAlgorithm,
-      highWaterMark,
-      autoAllocateChunkSize
-    });
-  } else {
-    controller = Object.create(ReadableStreamDefaultController.prototype);
-    SetUpReadableStreamDefaultController({
-      stream,
-      controller,
-      startAlgorithm,
-      pullAlgorithm,
-      cancelAlgorithm,
-      highWaterMark,
-      sizeAlgorithm
-    });
-  }
+    highWaterMark,
+    sizeAlgorithm
+  });
   return stream;
 }
 
-export function CreateReadableStream(params: {
-  startAlgorithm: StartAlgorithm;
-  pullAlgorithm: PullAlgorithm;
-  cancelAlgorithm: CancelAlgorithm;
-  highWaterMark?: number;
-  sizeAlgorithm?: SizeAlgorithm;
-}): ReadableStream {
-  return CreateReadableStreamInternal(params, false);
-}
-
-export function CreateReadableByteStream(params: {
-  startAlgorithm: StartAlgorithm;
-  pullAlgorithm: PullAlgorithm;
-  cancelAlgorithm: CancelAlgorithm;
-  highWaterMark?: number;
-  sizeAlgorithm?: SizeAlgorithm;
-}) {
-  return CreateReadableStreamInternal(params, true);
+export function CreateReadableByteStream(
+  startAlgorithm: StartAlgorithm,
+  pullAlgorithm: PullAlgorithm,
+  cancelAlgorithm: CancelAlgorithm,
+  highWaterMark: number = 1,
+  autoAllocateChunkSize?: number
+) {
+  Assert(IsNonNegativeNumber(highWaterMark));
+  if (autoAllocateChunkSize !== void 0) {
+    Assert(Number.isInteger(autoAllocateChunkSize));
+    Assert(autoAllocateChunkSize > 0);
+  }
+  const stream = Object.create(ReadableStream.prototype);
+  InitializeReadableStream(stream);
+  const controller = Object.create(ReadableByteStreamController.prototype);
+  SetUpReadableByteStreamController(
+    stream,
+    controller,
+    startAlgorithm,
+    pullAlgorithm,
+    cancelAlgorithm,
+    highWaterMark,
+    autoAllocateChunkSize
+  );
+  return stream;
 }
 
 export function InitializeReadableStream(stream: ReadableStream) {
@@ -430,16 +396,16 @@ export function ReadableStreamTee(
     return cancelPromise;
   };
   const startAlgorithm: StartAlgorithm = () => void 0;
-  branch1 = CreateReadableStream({
+  branch1 = CreateReadableStream(
     startAlgorithm,
     pullAlgorithm,
-    cancelAlgorithm: cancel1Algorithm
-  });
-  branch2 = CreateReadableStream({
+    cancel1Algorithm
+  );
+  branch2 = CreateReadableStream(
     startAlgorithm,
     pullAlgorithm,
-    cancelAlgorithm: cancel2Algorithm
-  });
+    cancel2Algorithm
+  );
   reader.closedPromise.catch(r => {
     if (!closedOrErrored) {
       ReadableStreamDefaultControllerError(branch1.readableStreamController, r);

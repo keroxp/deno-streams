@@ -101,28 +101,14 @@ export function AcquireWritableStreamDefaultWriter<T>(
   return new WritableStreamDefaultWriter(stream);
 }
 
-export function CreateWritableStream(params: {
-  startAlgorithm: StartAlgorithm;
-  writeAlgorithm: WriteAlgorithm;
-  closeAlgorithm: CloseAlgorithm;
-  abortAlgorithm: AbortAlgorithm;
-  highWaterMark?: number;
-  sizeAlgorithm?: SizeAlgorithm;
-}) {
-  let {
-    startAlgorithm,
-    writeAlgorithm,
-    closeAlgorithm,
-    abortAlgorithm,
-    highWaterMark,
-    sizeAlgorithm
-  } = params;
-  if (highWaterMark === void 0) {
-    highWaterMark = 1;
-  }
-  if (sizeAlgorithm === void 0) {
-    sizeAlgorithm = () => 1;
-  }
+export function CreateWritableStream(
+  startAlgorithm: StartAlgorithm,
+  writeAlgorithm: WriteAlgorithm,
+  closeAlgorithm: CloseAlgorithm,
+  abortAlgorithm: AbortAlgorithm,
+  highWaterMark: number = 1,
+  sizeAlgorithm: SizeAlgorithm = () => 1
+) {
   Assert(IsNonNegativeNumber(highWaterMark));
   const stream = Object.create(WritableStream.prototype);
   InitializeWritableStream(stream);

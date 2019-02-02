@@ -6,10 +6,9 @@ import {
   ReadableStreamCreateReadResult,
   ReadableStreamReadResult
 } from "./readable_stream.ts";
-import { defer, Defer } from "./defer.ts";
-import { Assert } from "./util.ts";
-import { ReadableStreamBYOBRequest } from "./readable_stream_request.ts";
-import { ReadableStreamBYOBReader } from "./readable_stream_byob_reader.ts";
+import {defer, Defer} from "./defer.ts";
+import {Assert} from "./util.ts";
+import {ReadableStreamBYOBReader} from "./readable_stream_byob_reader.ts";
 
 export interface ReadableStreamReader<T = any> {
   readonly closed: Promise<any>;

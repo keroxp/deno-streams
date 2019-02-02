@@ -1,11 +1,15 @@
-import { assertEqual, test } from "https://deno.land/x/testing@v0.2.6/mod.ts";
-import { ReadableStream } from "./readable_stream.ts";
-import { ReadableStreamBYOBReader } from "./readable_stream_byob_reader.ts";
+import {assertEqual, test} from "https://deno.land/x/testing@v0.2.6/mod.ts";
+import {ReadableStream} from "./readable_stream.ts";
+import {ReadableStreamBYOBReader} from "./readable_stream_byob_reader.ts";
+import {ReadableStreamDefaultReader} from "./readable_stream_reader.ts";
 
 test(async function testReadableStream() {
   const src = [0, 1, 2, 3, 4, 5, 6];
   let i = 0;
   const stream = new ReadableStream<number>({
+    start: controller => {
+      controller.enqueue(src[i++])
+    },
     pull: controller => {
       controller.enqueue(src[i++]);
       if (i >= src.length) {
@@ -14,9 +18,9 @@ test(async function testReadableStream() {
       }
     }
   });
-  const reader = stream.getReader();
+  const reader = stream.getReader() as ReadableStreamDefaultReader<number>;
   for (let i = 0; i < src.length + 1; i++) {
-    const { value, done } = await reader.read();
+    const {value, done} = await reader.read();
     if (i < 7) {
       assertEqual(value, i);
     } else {
@@ -46,9 +50,9 @@ test(async function testReadableStream2() {
       }
     }
   );
-  const reader = stream.getReader();
+  const reader = stream.getReader()as ReadableStreamDefaultReader<number>;
   for (let i = 0; i < src.length + 1; i += 2) {
-    const { value, done } = await reader.read();
+    const {value, done} = await reader.read();
     if (i < src.length) {
       assertEqual(value, [i, i + 1]);
     } else {
@@ -68,7 +72,7 @@ test(async function testReadableStream3() {
       controller.close();
     }
   });
-  const reader = stream.getReader({ mode: "byob" });
+  const reader = stream.getReader({mode: "byob"});
   assertEqual(reader.constructor, ReadableStreamBYOBReader);
   const buf = new Uint8Array(4);
   const res1 = await reader.read(buf);
@@ -93,7 +97,7 @@ test(async function testReadableStream4() {
       controller.close();
     }
   });
-  const reader = stream.getReader({ mode: "byob" });
+  const reader = stream.getReader({mode: "byob"});
   assertEqual(reader.constructor, ReadableStreamBYOBReader);
   const buf = new Uint8Array(2);
   const res1 = await reader.read(buf);

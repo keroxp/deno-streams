@@ -21,7 +21,7 @@ import {
 } from "./writable_stream_controller.ts";
 import { QueuingStrategy } from "./strategy.ts";
 
-export type WriteAlgorithm = (chunk) => any;
+export type WriteAlgorithm<T> = (chunk: T) => any;
 export type CloseAlgorithm = () => any;
 export type AbortAlgorithm = (reason) => any;
 
@@ -29,7 +29,7 @@ export class WritableStream<T = any> {
   constructor(
     underlyingSink: {
       start?: StartAlgorithm;
-      write?: WriteAlgorithm;
+      write?: WriteAlgorithm<T>;
       close?: CloseAlgorithm;
       abort?: AbortAlgorithm;
       type?: string;
@@ -101,9 +101,9 @@ export function AcquireWritableStreamDefaultWriter<T>(
   return new WritableStreamDefaultWriter(stream);
 }
 
-export function CreateWritableStream(
+export function CreateWritableStream<T>(
   startAlgorithm: StartAlgorithm,
-  writeAlgorithm: WriteAlgorithm,
+  writeAlgorithm: WriteAlgorithm<T>,
   closeAlgorithm: CloseAlgorithm,
   abortAlgorithm: AbortAlgorithm,
   highWaterMark: number = 1,

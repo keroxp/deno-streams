@@ -71,7 +71,7 @@ export class ReadableStream<T = any> {
   storedError: Error;
 
   constructor(
-    underlyingSource: UnderlyingSource<T>,
+    underlyingSource: UnderlyingSource<T> = {},
     strategy: QueuingStrategy = {}
   ) {
     InitializeReadableStream(this);

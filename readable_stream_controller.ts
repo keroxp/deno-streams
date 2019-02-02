@@ -220,7 +220,7 @@ export function ReadableStreamDefaultControllerEnqueue<T>(controller, chunk) {
     const stream = controller.controlledReadableStream;
     Assert(ReadableStreamDefaultControllerCanCloseOrEnqueue(controller));
     if (
-      IsReadableStreamLocked(stream) ||
+      IsReadableStreamLocked(stream) &&
       ReadableStreamGetNumReadRequests(stream) > 0
     ) {
       ReadableStreamFulfillReadRequest(stream, chunk, false);

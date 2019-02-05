@@ -56,7 +56,7 @@ export class WritableStreamDefaultController<T>
   started: boolean;
   strategyHWM: number;
   strategySizeAlgorithm: SizeAlgorithm;
-  writeAlgorithm: WriteAlgorithm;
+  writeAlgorithm: WriteAlgorithm<T>;
 
   constructor() {
     throw new TypeError();
@@ -84,7 +84,7 @@ export function SetUpWritableStreamDefaultController<T>(params: {
   stream: WritableStream;
   controller: WritableStreamDefaultController<T>;
   startAlgorithm: StartAlgorithm;
-  writeAlgorithm: WriteAlgorithm;
+  writeAlgorithm: WriteAlgorithm<T>;
   closeAlgorithm: CloseAlgorithm;
   abortAlgorithm: AbortAlgorithm;
   highWaterMark: number;
